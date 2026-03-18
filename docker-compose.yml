@@ -1,0 +1,58 @@
+services:
+  spark-iceberg:
+    image: tabulario/spark-iceberg
+    container_name: spark-iceberg
+    networks:
+      - iceberg_net
+    depends_on:
+      - rest
+    volumes:
+      - ./warehouse:/home/iceberg/warehouse
+      - .:/home/iceberg/notebooks/notebooks
+    environment:
+      - AWS_ACCESS_KEY_ID=GK5f421d5f440758f74b0e0312
+      - AWS_SECRET_ACCESS_KEY=409baa63477885db12cd1db0a518748c5e83e971b5e8cf2129fe6c7498de125d
+      - AWS_REGION=us-east-1
+      - AWS_DEFAULT_REGION=us-east-1
+      - CATALOG_WAREHOUSE=s3://warehouse/
+      - CATALOG_IO__IMPL=org.apache.iceberg.aws.s3.S3FileIO
+      - CATALOG_S3_ENDPOINT=http://172.16.58.11:31224
+      - CATALOG_S3_REGION=us-east-1
+      - CATALOG_CLIENT__REGION=us-east-1
+      - CATALOG_S3_PATH__STYLE__ACCESS=true
+      - CATALOG_S3_CHECKSUM__ALGORITHM=NONE
+      - CATALOG_S3_STREAMING__UPLOAD__ENABLED=false
+      - JAVA_TOOL_OPTIONS=-Daws.s3.disableChunkedEncoding=true
+    ports:
+      - 8888:8888
+      - 8080:8080
+      - 10000:10000
+      - 10001:10001
+
+  rest:
+    image: apache/iceberg-rest-fixture
+    container_name: iceberg-rest
+    networks:
+      - iceberg_net
+    ports:
+      - 8181:8181
+    environment:
+      - AWS_ACCESS_KEY_ID=GK5f421d5f440758f74b0e0312
+      - AWS_SECRET_ACCESS_KEY=409baa63477885db12cd1db0a518748c5e83e971b5e8cf2129fe6c7498de125d
+      - AWS_REGION=us-east-1
+      - AWS_DEFAULT_REGION=us-east-1
+      - CATALOG_WAREHOUSE=s3://warehouse/
+      - CATALOG_IO__IMPL=org.apache.iceberg.aws.s3.S3FileIO
+      - CATALOG_S3_ENDPOINT=http://172.16.58.11:31224
+      - CATALOG_S3_REGION=us-east-1
+      - CATALOG_CLIENT__REGION=us-east-1
+      - CATALOG_S3_PATH__STYLE__ACCESS=true
+      - CATALOG_S3_CHECKSUM__ALGORITHM=NONE
+      - CATALOG_S3_STREAMING__UPLOAD__ENABLED=false
+      - CATALOG_S3_PAYLOAD__SIGNING__ENABLED=true
+      - CATALOG_S3_HTTP__CLIENT__TYPE=urlconnection
+      - JAVA_TOOL_OPTIONS=-Daws.s3.disableChunkedEncoding=true -Daws.requestChecksumCalculation=when_required
+
+networks:
+  iceberg_net:
+    driver: bridge

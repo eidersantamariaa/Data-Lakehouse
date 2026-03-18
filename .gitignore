@@ -1,0 +1,9 @@
+notebooks/
+postgres-data/
+warehouse/
+venv/
+__pycache__/
+*.pyc
+.Trash-0/
+iceberg/
+*.parquet
