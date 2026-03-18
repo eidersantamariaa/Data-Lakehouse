@@ -1,0 +1,505 @@
+<style>
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0
+    }
+
+    .wrap {
+        position: relative;
+        border: 0.5px solid var(--color-border-tertiary);
+        border-radius: var(--border-radius-lg);
+        overflow: hidden;
+        background: var(--color-background-primary);
+        height: 640px
+    }
+
+    .grid {
+        display: grid;
+        grid-template-rows: 44px 1fr;
+        grid-template-columns: 236px 1fr;
+        height: 640px
+    }
+
+    .hdr {
+        grid-column: 1/-1;
+        display: flex;
+        align-items: center;
+        padding: 0 14px;
+        border-bottom: 0.5px solid var(--color-border-tertiary);
+        gap: 8px
+    }
+
+    .sidebar {
+        border-right: 0.5px solid var(--color-border-tertiary);
+        overflow-y: auto
+    }
+
+    .main {
+        overflow: hidden;
+        display: flex;
+        flex-direction: column
+    }
+
+    .ns {
+        padding: 10px 12px 4px;
+        font-size: 10px;
+        color: var(--color-text-secondary);
+        font-family: var(--font-mono);
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        display: flex;
+        align-items: center;
+        gap: 6px
+    }
+
+    .titem {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 6px 14px;
+        cursor: pointer;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--color-text-secondary);
+        border-left: 2px solid transparent
+    }
+
+    .titem:hover {
+        background: var(--color-background-secondary);
+        color: var(--color-text-primary)
+    }
+
+    .titem.sel {
+        background: var(--color-background-secondary);
+        color: var(--color-text-primary);
+        border-left-color: #1D9E75
+    }
+
+    .tabs {
+        display: flex;
+        border-bottom: 0.5px solid var(--color-border-tertiary);
+        padding: 0 16px;
+        flex-shrink: 0
+    }
+
+    .tab {
+        padding: 10px 14px;
+        font-size: 12px;
+        font-family: var(--font-mono);
+        cursor: pointer;
+        color: var(--color-text-secondary);
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        white-space: nowrap
+    }
+
+    .tab.on {
+        color: var(--color-text-primary);
+        border-bottom-color: #1D9E75
+    }
+
+    .content {
+        padding: 16px;
+        flex: 1;
+        overflow: auto
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 11px;
+        font-family: var(--font-mono)
+    }
+
+    .t-num {
+        background: var(--color-background-success);
+        color: var(--color-text-success)
+    }
+
+    .t-str {
+        background: var(--color-background-info);
+        color: var(--color-text-info)
+    }
+
+    .t-dbl {
+        background: var(--color-background-warning);
+        color: var(--color-text-warning)
+    }
+
+    .t-ts {
+        background: var(--color-background-secondary);
+        color: var(--color-text-secondary)
+    }
+
+    .t-bool {
+        background: var(--color-background-danger);
+        color: var(--color-text-danger)
+    }
+
+    .meta-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-bottom: 14px
+    }
+
+    .mc {
+        background: var(--color-background-secondary);
+        border-radius: var(--border-radius-md);
+        padding: 10px 12px
+    }
+
+    .ml {
+        font-size: 10px;
+        color: var(--color-text-secondary);
+        font-family: var(--font-mono);
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        margin-bottom: 3px
+    }
+
+    .mv {
+        font-size: 13px;
+        font-family: var(--font-mono);
+        color: var(--color-text-primary);
+        font-weight: 500
+    }
+
+    .srow {
+        display: grid;
+        grid-template-columns: 22px 1fr 100px 60px;
+        gap: 10px;
+        padding: 6px 0;
+        border-bottom: 0.5px solid var(--color-border-tertiary);
+        align-items: center;
+        font-size: 12px;
+        font-family: var(--font-mono)
+    }
+
+    .srow-h {
+        font-size: 10px;
+        color: var(--color-text-secondary);
+        padding-bottom: 4px;
+        border-bottom: 0.5px solid var(--color-border-secondary)
+    }
+
+    .dtbl {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        font-family: var(--font-mono)
+    }
+
+    .dtbl th {
+        text-align: left;
+        padding: 6px 10px;
+        border-bottom: 0.5px solid var(--color-border-tertiary);
+        color: var(--color-text-secondary);
+        font-weight: 400;
+        white-space: nowrap;
+        background: var(--color-background-primary)
+    }
+
+    .dtbl td {
+        padding: 5px 10px;
+        border-bottom: 0.5px solid var(--color-border-tertiary);
+        color: var(--color-text-primary);
+        white-space: nowrap
+    }
+
+    .dtbl tr:hover td {
+        background: var(--color-background-secondary)
+    }
+
+    .null {
+        color: var(--color-text-secondary);
+        font-style: italic
+    }
+
+    .snap {
+        padding: 10px 0;
+        border-bottom: 0.5px solid var(--color-border-tertiary);
+        font-size: 12px;
+        font-family: var(--font-mono)
+    }
+
+    .empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: var(--color-text-secondary);
+        gap: 10px;
+        font-family: var(--font-mono);
+        font-size: 12px
+    }
+
+    .ov {
+        position: absolute;
+        inset: 0;
+        display: none;
+        background: rgba(0, 0, 0, .4);
+        z-index: 10;
+        align-items: center;
+        justify-content: center
+    }
+
+    .ov.on {
+        display: flex
+    }
+
+    .modal {
+        background: var(--color-background-primary);
+        border: 0.5px solid var(--color-border-secondary);
+        border-radius: var(--border-radius-lg);
+        padding: 22px;
+        width: 340px
+    }
+
+    .modal h3 {
+        font-size: 13px;
+        font-weight: 500;
+        margin-bottom: 14px;
+        font-family: var(--font-mono)
+    }
+
+    .flabel {
+        font-size: 11px;
+        color: var(--color-text-secondary);
+        font-family: var(--font-mono);
+        display: block;
+        margin-bottom: 3px
+    }
+
+    .finput {
+        width: 100%;
+        margin-bottom: 10px;
+        font-family: var(--font-mono);
+        font-size: 12px
+    }
+
+    .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        flex-shrink: 0
+    }
+
+    .loc {
+        font-size: 11px;
+        color: var(--color-text-secondary);
+        font-family: var(--font-mono);
+        margin-bottom: 12px;
+        padding: 6px 8px;
+        background: var(--color-background-secondary);
+        border-radius: var(--border-radius-md)
+    }
+</style>
+
+<div class="wrap">
+    <div class="ov" id="ov">
+        <div class="modal">
+            <h3>connect to garage s3</h3>
+            <label class="flabel">endpoint url</label>
+            <input class="finput" type="text" id="f-ep" placeholder="https://s3.garage.example.com" />
+            <label class="flabel">access key id</label>
+            <input class="finput" type="text" id="f-ak" placeholder="GKxxxxxxxxxxxxxxxxxxxx" />
+            <label class="flabel">secret access key</label>
+            <input class="finput" type="password" id="f-sk" placeholder="••••••••••••••••••••••••" />
+            <label class="flabel">bucket</label>
+            <input class="finput" type="text" id="f-bk" placeholder="warehouse" />
+            <label class="flabel">warehouse prefix (optional)</label>
+            <input class="finput" type="text" id="f-wp" placeholder="iceberg/" />
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+                <button onclick="closeOv()">cancel</button>
+                <button onclick="doConnect()"
+                    style="background:var(--color-background-success);color:var(--color-text-success);border-color:var(--color-border-success)">connect</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="hdr">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M3 6l9-3 9 3v12l-9 3-9-3V6z" />
+                <path d="M12 3v18M3 6l9 3 9-3" />
+            </svg>
+            <span style="font-family:var(--font-mono);font-size:13px;font-weight:500">iceberg explorer</span>
+            <div style="flex:1"></div>
+            <div
+                style="display:flex;align-items:center;gap:5px;font-size:11px;font-family:var(--font-mono);color:var(--color-text-secondary)">
+                <div class="dot" id="dot" style="background:var(--color-text-warning)"></div>
+                <span id="clbl">demo mode</span>
+            </div>
+            <button onclick="showOv()"
+                style="font-family:var(--font-mono);font-size:11px;padding:4px 10px;margin-left:10px">connect</button>
+        </div>
+
+        <div class="sidebar" id="sidebar"></div>
+
+        <div class="main">
+            <div class="tabs" id="tabs" style="display:none">
+                <div class="tab on" onclick="switchTab('schema',this)">schema</div>
+                <div class="tab" onclick="switchTab('data',this)">preview</div>
+                <div class="tab" onclick="switchTab('snapshots',this)">snapshots</div>
+            </div>
+            <div class="content" id="content">
+                <div class="empty">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"
+                        opacity="0.35">
+                        <path d="M3 6l9-3 9 3v12l-9 3-9-3V6z" />
+                        <path d="M12 3v18M3 6l9 3 9-3" />
+                    </svg>
+                    <span>select a table to explore</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let T = {};
+
+    async function loadTables() {
+        const res = await fetch("/tables")
+        const tables = await res.json()
+
+        T = {}
+
+        tables.forEach(t => {
+            T[t] = {}
+        })
+
+        renderSidebar()
+    }
+
+    async function loadSchema(table) {
+        const res = await fetch(`/schema/${table}`)
+        return await res.json()
+    }
+
+    let sel = null, tab = 'schema';
+    const typeClass = { long: 't-num', int: 't-num', string: 't-str', double: 't-dbl', timestamp: 't-ts', boolean: 't-bool' };
+
+    function fmt(n) { return n.toLocaleString() }
+
+    function badge(t) { return `<span class="badge ${typeClass[t] || 't-str'}">${t}</span>` }
+
+    function renderSidebar() {
+        const ns = {};
+        Object.keys(T).forEach(k => { const [n, t] = k.split('.'); (ns[n] = ns[n] || []).push({ k, t }) });
+        let h = '';
+        Object.entries(ns).forEach(([n, tables]) => {
+            h += `<div class="ns"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-4 0v2"/></svg>${n}</div>`;
+            tables.forEach(({ k, t }) => {
+                const s = sel === k ? ' sel' : '';
+                h += `<div class="titem${s}" onclick="pick('${k}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 9v12"/></svg>${t}</div>`;
+            });
+        });
+        document.getElementById('sidebar').innerHTML = h;
+    }
+
+    function renderSchema(d) {
+        const rows = d.schema.map(f => `<div class="srow"><span style="color:var(--color-text-secondary);font-size:11px">${f.id}</span><span>${f.n}</span>${badge(f.t)}<span style="font-size:11px;color:${f.req ? 'var(--color-text-success)' : 'var(--color-text-secondary)'}">${f.req ? 'req' : ''}</span></div>`).join('');
+        return `<div class="meta-grid"><div class="mc"><div class="ml">rows</div><div class="mv">${fmt(d.rows)}</div></div><div class="mc"><div class="ml">data files</div><div class="mv">${fmt(d.files)}</div></div><div class="mc"><div class="ml">size</div><div class="mv">${d.size}</div></div><div class="mc"><div class="ml">partition</div><div class="mv" style="font-size:11px">${d.part}</div></div></div><div class="loc">📍 ${d.loc}</div><div class="srow srow-h"><span></span><span>field</span><span>type</span><span>req</span></div>${rows}`;
+    }
+
+    function renderData(d) {
+        const cols = d.schema.map(f => f.n);
+        const ths = cols.map(c => `<th>${c}</th>`).join('');
+        const trs = d.preview.map(row => `<tr>${cols.map(c => { const v = row[c]; return v === null ? `<td><span class="null">null</span></td>` : `<td>${v}</td>` }).join('')}</tr>`).join('');
+        return `<div style="font-size:11px;color:var(--color-text-secondary);font-family:var(--font-mono);margin-bottom:10px">showing 5 of ${fmt(d.rows)} rows &nbsp;·&nbsp; snapshot ${d.snap}</div><div style="overflow-x:auto"><table class="dtbl"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
+    }
+
+    function renderSnaps(d) {
+        return d.snaps.map((s, i) => `<div class="snap"><div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">${i === 0 ? `<span class="badge" style="background:var(--color-background-success);color:var(--color-text-success)">current</span>` : ''}<span style="color:var(--color-text-secondary)">snap #${s.id}</span><span style="margin-left:auto;color:var(--color-text-secondary)">${s.ts}</span></div><div style="display:flex;gap:16px"><span style="color:var(--color-text-secondary)">op: <b style="color:var(--color-text-primary);font-weight:400">${s.op}</b></span><span style="color:var(--color-text-secondary)">added: <b style="color:var(--color-text-primary);font-weight:400">${s.add}</b></span><span style="color:var(--color-text-secondary)">removed: <b style="color:var(--color-text-primary);font-weight:400">${s.rem}</b></span><span style="color:var(--color-text-secondary)">records: <b style="color:var(--color-text-success);font-weight:400">${s.rec}</b></span></div></div>`).join('');
+    }
+
+    async function loadPreview(table) {
+        const res = await fetch(`/preview/${table}`)
+        return await res.json()
+    }
+
+    async function loadSnaps(table) {
+        const res = await fetch(`/snapshots/${table}`)
+        return await res.json()
+    }
+
+    async function pick(k) {
+        sel = k
+        tab = 'schema'
+
+        const schema = await loadSchema(k)
+        const preview = await loadPreview(k)
+        const snapsData = await loadSnaps(k)
+
+        T[k] = {
+            ...schema,
+            preview: preview.preview || [],
+            snap: preview.snap || "—",
+            snaps: snapsData.snaps || []
+        }
+
+        document.getElementById('tabs').style.display = 'flex'
+        renderSidebar()
+        renderContent()
+    }
+
+    function renderContent() {
+        if (!sel) return;
+        const d = T[sel];
+        let h = '';
+        if (tab === 'schema') h = renderSchema(d);
+        else if (tab === 'data') h = renderData(d);
+        else h = renderSnaps(d);
+        document.getElementById('content').innerHTML = h;
+    }
+
+    function switchTab(t, el) {
+        tab = t;
+        document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+        el.classList.add('on');
+        renderContent();
+    }
+
+    function showOv() { document.getElementById('ov').classList.add('on') }
+    function closeOv() { document.getElementById('ov').classList.remove('on') }
+    async function doConnect() {
+        const ep = document.getElementById('f-ep').value;
+        const ak = document.getElementById('f-ak').value;
+        const sk = document.getElementById('f-sk').value;
+        const wp = document.getElementById('f-wp').value;
+        const bk = document.getElementById('f-bk').value;
+
+        // S3 endpoint
+        let ep_s3 = ep
+            .replace(/localhost:8181/, "172.16.58.11:31224")
+            .replace(/:32688/, ":31224");
+
+
+        try {
+            const res = await fetch('/connect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ep, ep_s3, ak, sk, bk, wp })
+            });
+
+            const data = await res.json();
+            if (res.ok && data.status === "ok") {
+                document.getElementById('dot').style.background = '#1D9E75';
+                document.getElementById('clbl').textContent = 'connected';
+                closeOv();
+                loadTables(); // refresca sidebar
+            } else {
+                alert('Connection failed: ' + (data.msg || 'unknown error'));
+            }
+        } catch (e) {
+            alert('Connection failed: ' + e.message);
+        }
+    }
+
+    renderSidebar();
+</script>
