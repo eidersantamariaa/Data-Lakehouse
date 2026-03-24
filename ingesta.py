@@ -34,7 +34,12 @@ def get_spark():
         .set("spark.driver.extraJavaOptions", "-Daws.requestChecksumCalculation=when_required")
         
     )
-    return SparkSession.builder.config(conf=conf).getOrCreate()
+    builder = SparkSession.builder
+
+    for k, v in conf.getAll():
+        builder = builder.config(k, v)
+
+    return builder.getOrCreate()
 
 
 def run_ingesta(config):
