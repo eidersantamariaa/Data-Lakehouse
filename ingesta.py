@@ -87,7 +87,8 @@ def run_ingesta(config):
                 accion = "CREATE"
             else:
                 raise  # error real → lo propagamos, no lo silenciamos
-            write_audit_log(spark, config.NAMESPACE, f"{table_name}_bronce", accion, len(records))
+            
+        write_audit_log(spark, config.NAMESPACE, f"{table_name}_bronce", accion, len(records))
 
         print(f"✅ {table_name} written successfully")
 
