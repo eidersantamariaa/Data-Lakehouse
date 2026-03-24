@@ -1,5 +1,6 @@
 from pyspark.sql import functions as F
 from pyspark.sql.types import StructType, StructField, StringType, TimestampType, LongType
+from pyspark.errors.exceptions.captured import AnalysisException
 import datetime
 
 def write_audit_log(spark, namespace, table_name, accion, num_registros):
@@ -23,7 +24,10 @@ def write_audit_log(spark, namespace, table_name, accion, num_registros):
     
     try:
         df_audit.writeTo(f"players.{namespace}.audit_log").append()
-    except Exception:
-        df_audit.writeTo(f"players.{namespace}.audit_log") \
-            .tableProperty("format-version", "2") \
-            .createIfNotExists()
+    except AnalysisException as e:
+            if "TABLE_OR_VIEW_NOT_FOUND" in str(e) or "Table not found" in str(e):
+                df_audit.writeTo(f"players.{namespace}.audit_log") \
+                    .tableProperty("format-version", "2") \
+                    .create()
+                
+    
