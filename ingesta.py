@@ -8,7 +8,7 @@ def get_spark():
     conf = (
         pyspark.SparkConf()
         .setAppName('ingesta')
-        .set('spark.jars.packages', 'org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.8.1,org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.367')
+        .set('spark.jars.packages', 'org.apache.iceberg:iceberg-spark-runtime-4.0_2.13:1.8.1,org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.367')
         #.set('spark.sql.extensions', 'org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions')
         .set("spark.sql.catalog.players", "org.apache.iceberg.spark.SparkCatalog")
         .set("spark.sql.catalog.players.type", "rest")
@@ -34,12 +34,7 @@ def get_spark():
         .set("spark.driver.extraJavaOptions", "-Daws.requestChecksumCalculation=when_required")
         
     )
-    builder = SparkSession.builder
-
-    for k, v in conf.getAll():
-        builder = builder.config(k, v)
-
-    return builder.getOrCreate()
+    return SparkSession.builder.config(conf=conf).getOrCreate()
 
 
 def run_ingesta(config):
