@@ -14,7 +14,7 @@ def write_audit_log(spark, namespace, table_name, accion, num_registros):
     row = [(
         table_name,
         accion,
-        datetime.now(),
+        datetime.datetime.now(),
         namespace,
         num_registros
     )]
