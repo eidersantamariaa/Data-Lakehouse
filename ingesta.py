@@ -13,6 +13,10 @@ def get_spark():
         "org.apache.hadoop:hadoop-aws:3.3.4,"
         "com.amazonaws:aws-java-sdk-bundle:1.12.367"
     )
+    builder = builder.config(
+        "spark.sql.extensions",
+        "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
+    )
 
     # Iceberg catalog
     builder = builder.config("spark.sql.catalog.players", "org.apache.iceberg.spark.SparkCatalog")
