@@ -2,6 +2,8 @@ import json
 from pyspark.sql import SparkSession
 import pyspark
 
+from audit_log import write_audit_log
+
 def get_spark():
     conf = (
         pyspark.SparkConf()
@@ -46,7 +48,19 @@ def run_ingesta(config):
         df = spark.read.json(spark.sparkContext.parallelize(
             [json.dumps(r) for r in records]
         ))
-        df.writeTo(f"players.{config.NAMESPACE}.{table_name}_bronce").createOrReplace()
+        try:
+            df.writeTo(f"players.{config.NAMESPACE}.{table_name}_bronce").append()
+            accion = "INSERT"
+        except AnalysisException as e:
+            if "TABLE_OR_VIEW_NOT_FOUND" in str(e) or "Table not found" in str(e):
+                df.writeTo(f"players.{config.NAMESPACE}.{table_name}_bronce") \
+                    .tableProperty("format-version", "2") \
+                    .createIfNotExists()
+                accion = "CREATE"
+            else:
+                raise  # error real → lo propagamos, no lo silenciamos
+            write_audit_log(spark, config.NAMESPACE, f"{table_name}_bronce", accion, len(records))
+
         print(f"✅ {table_name} written successfully")
 
          # Compacta ficheros pequeños

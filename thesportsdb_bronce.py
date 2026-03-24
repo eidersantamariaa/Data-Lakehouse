@@ -40,11 +40,11 @@ def getBig5():
         pass
     
     BIG5_NAMES = {
-        ("English Premier League"),
+        #("English Premier League"),
         ("Spanish La Liga"),
-        ("Italian Serie A"),
-        ("German Bundesliga"),
-        ("French Ligue 1")
+        #("Italian Serie A"),
+        #("German Bundesliga"),
+        #("French Ligue 1")
     }
 
     big5 = {}
@@ -98,7 +98,7 @@ def getTeams(big5):
         team_data = response.json()
         if not team_data["teams"]:
             continue
-        all_teams.append(team_data["teams"])
+        all_teams.append(team_data["teams"][0])
 
     print("Teams retrieved successfully.")
     return teams, all_teams
