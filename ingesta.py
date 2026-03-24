@@ -10,8 +10,12 @@ def get_spark():
     builder = builder.config(
         "spark.jars.packages",
         "org.apache.iceberg:iceberg-spark-runtime-4.0_2.13:1.10.1,"
-        "org.apache.hadoop:hadoop-aws:3.3.4,"
+        "org.apache.hadoop:hadoop-aws:3.4.2,"
         "com.amazonaws:aws-java-sdk-bundle:1.12.367"
+    )
+    builder = builder.config(
+        "spark.jars.excludes",
+        "org.apache.hadoop:hadoop-client-runtime,org.apache.hadoop:hadoop-client-api"
     )
     builder = builder.config(
         "spark.sql.extensions",
@@ -49,6 +53,10 @@ def get_spark():
     # Java options
     builder = builder.config("spark.executor.extraJavaOptions", "-Daws.requestChecksumCalculation=when_required")
     builder = builder.config("spark.driver.extraJavaOptions", "-Daws.requestChecksumCalculation=when_required")
+
+    conf = builder.getOrCreate().sparkContext.getConf()
+    print("Extensions:", conf.get("spark.sql.extensions", "NO CONFIGURADO"))
+    print("Catalog players:", conf.get("spark.sql.catalog.players", "NO CONFIGURADO"))
 
     return builder.getOrCreate()
 
