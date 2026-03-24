@@ -40,11 +40,11 @@ def getBig5():
         pass
     
     BIG5_NAMES = {
-        #("English Premier League"),
+        ("English Premier League"),
         ("Spanish La Liga"),
-        #("Italian Serie A"),
-        #("German Bundesliga"),
-        #("French Ligue 1")
+        ("Italian Serie A"),
+        ("German Bundesliga"),
+        ("French Ligue 1")
     }
 
     big5 = {}

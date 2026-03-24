@@ -32,7 +32,7 @@ async def connect_catalog(req: Request):
                 "s3.secret-access-key": data["sk"],
                 "s3.region": "us-east-1",
                 "s3.path-style-access": "true",
-                "py-io-impl": "pyiceberg.io.fsspec.FsspecFileIO",
+                "py-io-impl": "pyiceberg.io.pyarrow.PyArrowFileIO",
             }
         )
         # Guarda los datos de conexión para usarlos en preview
@@ -86,78 +86,36 @@ def schema(table: str):
 @app.get("/preview/{table}")
 def preview(table: str):
     if catalog is None:
-        return {}
+        return {"error": "Catalog not connected"}
+    
     ns, tbl_name = table.split(".", 1)
     t = catalog.load_table((ns, tbl_name))
     snap = t.current_snapshot()
     summary = snap.summary if snap else {}
 
+    rows = []
     try:
-        import subprocess, pyarrow.parquet as pq, io as _io, os, tempfile
+        # 1. Escaneamos la tabla y pedimos solo las primeras 5 filas
+        # PyIceberg usa PyArrow internamente para esto.
+        # .limit(5) es eficiente: no descarga toda la tabla.
+        table_scan = t.scan(limit=5).to_arrow()
+        
+        # 2. Convertimos a lista de diccionarios
+        raw_rows = table_scan.to_pylist()
 
-        location = t.location()  # s3://warehouse/thesportsdb/leagues_bronce
-        data_path = location + "/data/"
-
-        env = {
-            **os.environ,
-            "AWS_ACCESS_KEY_ID": s3_config["ak"],
-            "AWS_SECRET_ACCESS_KEY": s3_config["sk"],
-            "AWS_DEFAULT_REGION": "us-east-1",
-        }
-
-        # Lista los parquets con aws cli
-        result = subprocess.run([
-            "docker", "exec", "spark-iceberg",
-            "aws", "s3", "ls", data_path,
-            "--endpoint-url", s3_config["ep_s3"],
-        ], capture_output=True, text=True, env=env)
-
-        print("stdout:", result.stdout)
-        print("stderr:", result.stderr)
-        print("returncode:", result.returncode)
-
-        parquets = []
-        for line in result.stdout.strip().splitlines():
-            parts = line.split()
-            if parts and parts[-1].endswith(".parquet"):
-                parquets.append(data_path + parts[-1])
-
-        print(f"parquets encontrados: {len(parquets)}")
-        for p in parquets[:3]:
-            print(f"  {p}")
-
-        rows = []
-        for parquet_key in parquets:
-            if len(rows) >= 5:
-                break
-
-            with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as tmp:
-                tmp_path = tmp.name
-
-            # Descarga dentro del contenedor y copia al host
-            subprocess.run([
-                "docker", "exec", "spark-iceberg",
-                "aws", "s3", "cp", parquets[0], "/tmp/preview.parquet",
-                "--endpoint-url", s3_config["ep_s3"],
-            ], capture_output=True, env=env)
-
-            subprocess.run([
-                "docker", "cp", "spark-iceberg:/tmp/preview.parquet", tmp_path
-            ], capture_output=True)
-
-            batch = pq.read_table(tmp_path)
-            print(f"filas en este fichero: {batch.num_rows}")
-            os.unlink(tmp_path)
-
-            needed = 5 - len(rows)
-            for row in batch.slice(0, min(needed, batch.num_rows)).to_pylist():
-                for k, v in row.items():
-                    row[k] = str(v) if not isinstance(v, (str, int, float, bool, type(None))) else v
-                rows.append(row)
+        # 3. Formateamos tipos complejos (igual que tenías antes)
+        for row in raw_rows:
+            formatted_row = {}
+            for k, v in row.items():
+                # Convertimos a string lo que no sea un tipo básico
+                if v is not None and not isinstance(v, (str, int, float, bool)):
+                    formatted_row[k] = str(v)
+                else:
+                    formatted_row[k] = v
+            rows.append(formatted_row)
 
     except Exception as e:
-        print("❌ preview error:", e)
-        import traceback; traceback.print_exc()
+        print(f"❌ preview error: {e}")
         rows = []
 
     return {
