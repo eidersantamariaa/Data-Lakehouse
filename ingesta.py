@@ -53,6 +53,10 @@ def get_spark():
     # Java options
     builder = builder.config("spark.executor.extraJavaOptions", "-Daws.requestChecksumCalculation=when_required")
     builder = builder.config("spark.driver.extraJavaOptions", "-Daws.requestChecksumCalculation=when_required")
+    
+    # Credenciales para Iceberg S3FileIO (SDK v2)
+    builder = builder.config("spark.sql.catalog.players.s3.access-key-id", "GK5f421d5f440758f74b0e0312")
+    builder = builder.config("spark.sql.catalog.players.s3.secret-access-key", "409baa63477885db12cd1db0a518748c5e83e971b5e8cf2129fe6c7498de125d")
 
     conf = builder.getOrCreate().sparkContext.getConf()
     print("Extensions:", conf.get("spark.sql.extensions", "NO CONFIGURADO"))
