@@ -9,7 +9,7 @@ def get_spark():
 
     builder = builder.config(
         "spark.jars.packages",
-        "org.apache.iceberg:iceberg-spark-runtime-4.0_2.13-1.10.1,"
+        "org.apache.iceberg:iceberg-spark-runtime-4.0_2.13:1.10.1,"
         "org.apache.hadoop:hadoop-aws:3.3.4,"
         "com.amazonaws:aws-java-sdk-bundle:1.12.367"
     )
