@@ -1,7 +1,7 @@
 import json
 from pyspark.sql import SparkSession
 import pyspark
-
+from pyspark.errors.exceptions.captured import AnalysisException
 from audit_log import write_audit_log
 
 def get_spark():
