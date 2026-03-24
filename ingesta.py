@@ -79,7 +79,7 @@ def run_ingesta(config):
             if "TABLE_OR_VIEW_NOT_FOUND" in str(e) or "Table not found" in str(e):
                 df.writeTo(f"players.{config.NAMESPACE}.{table_name}_bronce") \
                     .tableProperty("format-version", "2") \
-                    .createIfNotExists()
+                    .create()
                 accion = "CREATE"
             else:
                 raise  # error real → lo propagamos, no lo silenciamos
