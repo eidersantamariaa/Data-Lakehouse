@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, HTMLResponse
 from pyiceberg.catalog import load_catalog
@@ -179,6 +181,84 @@ def _tt():
     if tt is None:
         raise RuntimeError("Catalog no conectado")
     return tt
+
+
+def _write_audit_log(namespace: str, table_name: str, accion: str, num_registros: int = 0):
+    """Best-effort audit log writer using PyIceberg table append if available."""
+    if catalog is None:
+        return False
+
+    try:
+        audit_table = catalog.load_table((namespace, "audit_log"))
+    except Exception:
+        # If audit table does not exist, skip silently (best-effort behavior)
+        return False
+
+    row = {
+        "tabla": table_name,
+        "accion": accion,
+        "timestamp": datetime.now(timezone.utc),
+        "fuente": namespace,
+        "num_registros": int(num_registros),
+    }
+
+    try:
+        arrow_tbl = pa.Table.from_pylist([row])
+
+        # PyIceberg versions differ in write APIs; try common entry points.
+        if hasattr(audit_table, "append"):
+            audit_table.append(arrow_tbl)
+        elif hasattr(audit_table, "add_files"):
+            # Not ideal for row writes, but keep fallback for API variance.
+            return False
+        else:
+            return False
+        return True
+    except Exception as e:
+        print(f"⚠ audit_log write failed: {e}")
+        return False
+
+
+@app.post("/table/delete/{table}")
+def delete_table(table: str):
+    """Elimina una tabla, registra la accion en audit_log y devuelve el comando ejecutado."""
+    if catalog is None:
+        return JSONResponse({"error": "Catalog not connected"}, status_code=400)
+
+    try:
+        ns, tbl_name = table.split(".", 1)
+    except ValueError:
+        return JSONResponse({"error": "Formato invalido, usa namespace.tabla"}, status_code=400)
+
+    # Command string shown in server logs and returned to UI
+    cmd = f"DROP TABLE players.{ns}.{tbl_name} PURGE"
+    print(f"🗑 executing server command: {cmd}")
+
+    try:
+        # Try signatures compatible across pyiceberg versions
+        try:
+            catalog.drop_table((ns, tbl_name), purge_requested=True)
+        except TypeError:
+            try:
+                catalog.drop_table((ns, tbl_name), purge=True)
+            except TypeError:
+                catalog.drop_table((ns, tbl_name))
+
+        audit_written = _write_audit_log(
+            namespace=ns,
+            table_name=tbl_name,
+            accion= "DROP",
+            num_registros=0,
+        )
+
+        return {
+            "status": "ok",
+            "table": table,
+            "server_command": cmd,
+            "audit_logged": audit_written,
+        }
+    except Exception as e:
+        return JSONResponse({"error": str(e), "server_command": cmd}, status_code=400)
 
 @app.get("/tt/read-snapshot/{table}")
 def tt_read_snapshot(table: str, snapshot_id: str, limit: int = 50):

@@ -749,6 +749,11 @@
             <div class="mc"><div class="ml">partition</div><div class="mv" style="font-size:11px">${d.part}</div></div>
         </div>
         <div class="loc">📍 ${d.loc}</div>
+        <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:10px;margin-bottom:12px">
+            <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:8px">danger zone</div>
+            <button class="tt-btn-danger" onclick="doDeleteTable()">delete table</button>
+            <div id="tbl-del-result" class="tt-result" style="margin-top:8px"></div>
+        </div>
         <div class="srow srow-h"><span></span><span>field</span><span>type</span><span>req</span></div>
         ${rows}`;
         }
@@ -981,6 +986,32 @@
             ${resultTable(data)}`);
             } catch (e) {
                 setResult('tt-read-result', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`);
+            }
+        }
+
+        async function doDeleteTable() {
+            if (!sel) return;
+            if (!confirm(`¿Seguro que quieres borrar la tabla '${sel}'? Esta accion elimina metadatos y datos de la tabla.`)) return;
+
+            spin('tbl-del-result');
+            try {
+                const r = await fetch(`/table/delete/${sel}`, { method: 'POST' });
+                const data = await r.json();
+                if (data.error) throw new Error(data.error);
+
+                setResult('tbl-del-result', `
+            <div class="tt-result-hdr"><span class="ok">✓ tabla borrada</span></div>
+            <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px">
+                comando servidor: <b style="color:var(--color-text-primary)">${esc(data.server_command || '—')}</b><br>
+                audit_log: <b style="color:${data.audit_logged ? 'var(--color-text-success)' : 'var(--color-text-warning)'}">${data.audit_logged ? 'registrado' : 'no disponible'}</b>
+            </div>`);
+
+                sel = null;
+                document.getElementById('tabs').style.display = 'none';
+                document.getElementById('content').innerHTML = `<div class="empty"><span>table deleted</span></div>`;
+                await loadTables();
+            } catch (e) {
+                setResult('tbl-del-result', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`);
             }
         }
 
