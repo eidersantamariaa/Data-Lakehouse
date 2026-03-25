@@ -303,6 +303,23 @@
             background: var(--color-background-secondary);
         }
 
+        .row-added {
+            background: var(--color-background-success);
+        }
+
+        .row-added:hover td {
+            background: rgba(22, 163, 74, .25);
+        }
+
+        .row-removed {
+            opacity: 0.55;
+            background: var(--color-background-danger);
+        }
+
+        .row-removed:hover td {
+            background: rgba(220, 50, 50, .25);
+        }
+
         .null {
             color: var(--color-text-secondary);
             font-style: italic;
@@ -915,10 +932,19 @@
         function resultTable(data) {
             if (!data.rows || !data.rows.length) return `<div style="font-size:12px;color:var(--color-text-secondary);margin-top:8px">no rows returned</div>`;
             const cols = data.columns || Object.keys(data.rows[0]);
-            const ths = cols.map(c => `<th>${c}</th>`).join('');
-            const trs = data.rows.map(row => `<tr>${cols.map(c => {
-                const v = row[c]; return v === null ? `<td><span class="null">null</span></td>` : `<td>${esc(String(v))}</td>`;
-            }).join('')}</tr>`).join('');
+            // Filter out __change_type from display columns
+            const displayCols = cols.filter(c => !c.startsWith('__'));
+            const ths = displayCols.map(c => `<th>${c}</th>`).join('');
+            const trs = data.rows.map(row => {
+                const changeType = row['__change_type'] || 'normal';
+                let rowClass = '';
+                if (changeType === 'added') rowClass = ' class="row-added"';
+                else if (changeType === 'removed') rowClass = ' class="row-removed"';
+
+                return `<tr${rowClass}>${displayCols.map(c => {
+                    const v = row[c]; return v === null ? `<td><span class="null">null</span></td>` : `<td>${esc(String(v))}</td>`;
+                }).join('')}</tr>`;
+            }).join('');
             const trunc = data.truncated ? `<div style="font-size:11px;color:var(--color-text-warning);margin-top:6px">⚠ resultado truncado a ${data.rows.length} filas</div>` : '';
             return `<div style="overflow-x:auto"><table class="dtbl"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>${trunc}`;
         }
@@ -1008,10 +1034,13 @@
                 const r = await fetch(`/tt/changes/${sel}?start_snapshot_id=${from_id}&end_snapshot_id=${to_id}&limit=${limit}`);
                 const data = await r.json();
                 if (data.error) throw new Error(data.error);
+                const addedDisplay = data.added_records > 0 ? `<span style="color:var(--color-text-success)">+ ${data.added_records}</span>` : '';
+                const removedDisplay = data.removed_records > 0 ? `<span style="color:var(--color-text-danger)">− ${data.removed_records}</span>` : '';
+                const separator = (data.added_records > 0 && data.removed_records > 0) ? ' · ' : '';
                 setResult('tt-ch-result', `
             <div class="tt-result-hdr">
                 <span>${from_id}</span> → <span>${to_id}</span>
-                <span class="ok">✓ ${data.added_records} registros añadidos</span>
+                <span class="ok">${addedDisplay}${separator}${removedDisplay}</span>
             </div>
             ${resultTable(data)}`);
             } catch (e) {

@@ -112,7 +112,11 @@ class TimeTraveler:
         t = self._load(table)
         ids = [s.snapshot_id for s in t.metadata.snapshots]
         if snapshot_id not in ids:
-            raise ValueError(f"Snapshot {snapshot_id} no existe en la tabla '{table}'")
+            available = ", ".join(str(id) for id in ids[-5:]) if ids else "ninguno"
+            raise ValueError(
+                f"Snapshot {snapshot_id} no existe en la tabla '{table}'. "
+                f"Snapshots disponibles (últimos 5): {available}"
+            )
 
         arrow = t.scan(snapshot_id=snapshot_id, limit=limit).to_arrow()
         rows = _arrow_to_rows(arrow)
@@ -172,7 +176,11 @@ class TimeTraveler:
 
         ids = [s.snapshot_id for s in t.metadata.snapshots]
         if snapshot_id not in ids:
-            raise ValueError(f"Snapshot {snapshot_id} no encontrado en '{table}'")
+            available = ", ".join(str(id) for id in ids[-5:]) if ids else "ninguno"
+            raise ValueError(
+                f"Snapshot {snapshot_id} no encontrado en '{table}'. "
+                f"Snapshots disponibles (últimos 5): {available}"
+            )
 
         with t.manage_snapshots() as ms:
             ms.rollback_to_snapshot(snapshot_id)
@@ -225,31 +233,71 @@ class TimeTraveler:
         limit: int = 200,
     ) -> dict:
         """
-        Devuelve los registros anadidos entre dos snapshots (append-only incremental).
-        Util para auditoria y deteccion de cambios.
+        Devuelve los registros anadidos y eliminados entre dos snapshots.
+        Lee ambos snapshots y devuelve:
+        - Registros agregados (que existen en final pero no en inicial)
+        - Registros eliminados (que existen en inicial pero no en final)
 
-        Devuelve: rows, columns, added_records, truncated
+        Devuelve: rows (con __change_type), columns, added_records, removed_records, truncated
         """
         t = self._load(table)
+        ids = [s.snapshot_id for s in t.metadata.snapshots]
+        
+        # Validate both snapshots exist
+        for snap_id in [start_snapshot_id, end_snapshot_id]:
+            if snap_id not in ids:
+                available = ", ".join(str(id) for id in ids[-5:]) if ids else "ninguno"
+                raise ValueError(
+                    f"Snapshot {snap_id} no encontrado en '{table}'. "
+                    f"Snapshots disponibles (últimos 5): {available}"
+                )
 
-        scan = t.incremental_append_scan(
-            from_snapshot_id=start_snapshot_id,
-            to_snapshot_id=end_snapshot_id,
-        )
-        arrow = scan.to_arrow()
-        truncated = arrow.num_rows > limit
+        # Read both snapshots to compare
+        start_arrow = t.scan(snapshot_id=start_snapshot_id).to_arrow()
+        end_arrow = t.scan(snapshot_id=end_snapshot_id).to_arrow()
+        
+        start_rows = start_arrow.to_pylist()
+        end_rows = end_arrow.to_pylist()
+        
+        # Convert to sets for comparison (using JSON string representation)
+        import json
+        start_set = {json.dumps(row, sort_keys=True, default=str) for row in start_rows}
+        end_set = {json.dumps(row, sort_keys=True, default=str) for row in end_rows}
+        
+        # Find added rows (in end but not in start)
+        added_rows_json = end_set - start_set
+        added_rows = [json.loads(row_json) for row_json in sorted(added_rows_json)]
+        
+        # Find removed rows (in start but not in end)
+        removed_rows_json = start_set - end_set
+        removed_rows = [json.loads(row_json) for row_json in sorted(removed_rows_json)]
+        
+        # Combine and tag with change type
+        all_changes = []
+        for row in added_rows:
+            formatted = {k: _format_value(v) for k, v in row.items()}
+            formatted["__change_type"] = "added"
+            all_changes.append(formatted)
+        
+        for row in removed_rows:
+            formatted = {k: _format_value(v) for k, v in row.items()}
+            formatted["__change_type"] = "removed"
+            all_changes.append(formatted)
+        
+        # Apply limit and track if truncated
+        truncated = len(all_changes) > limit
         if truncated:
-            arrow = arrow.slice(0, limit)
-
-        rows = _arrow_to_rows(arrow)
-        log.info("[incremental] %s: %d -> %d, %d filas nuevas",
-                 table, start_snapshot_id, end_snapshot_id, len(rows))
+            all_changes = all_changes[:limit]
+        
+        log.info("[incremental] %s: %d -> %d, +%d agregados -%d eliminados",
+                 table, start_snapshot_id, end_snapshot_id, len(added_rows), len(removed_rows))
         return {
             "from_snapshot_id": start_snapshot_id,
             "to_snapshot_id":   end_snapshot_id,
-            "columns":          arrow.column_names,
-            "rows":             rows,
-            "added_records":    len(rows),
+            "columns":          end_arrow.column_names,
+            "rows":             all_changes,
+            "added_records":    len(added_rows),
+            "removed_records":  len(removed_rows),
             "truncated":        truncated,
         }
 

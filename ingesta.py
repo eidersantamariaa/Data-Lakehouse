@@ -76,21 +76,28 @@ def run_ingesta(config):
         df = spark.read.json(spark.sparkContext.parallelize(
             [json.dumps(r) for r in records]
         ))
+        
+        # Deduplicate: remove exact duplicates (same values in all columns)
+        df_dedup = df.dropDuplicates()
+        dedup_count = df.count() - df_dedup.count()
+        if dedup_count > 0:
+            print(f"  ⚠ Removed {dedup_count} duplicate record(s) from this batch")
+        
         try:
-            df.writeTo(f"players.{config.NAMESPACE}.{table_name}_bronce").append()
+            df_dedup.writeTo(f"players.{config.NAMESPACE}.{table_name}_bronce").append()
             accion = "INSERT"
         except AnalysisException as e:
             if "TABLE_OR_VIEW_NOT_FOUND" in str(e) or "Table not found" in str(e):
-                df.writeTo(f"players.{config.NAMESPACE}.{table_name}_bronce") \
+                df_dedup.writeTo(f"players.{config.NAMESPACE}.{table_name}_bronce") \
                     .tableProperty("format-version", "2") \
                     .create()
                 accion = "CREATE"
             else:
                 raise  # error real → lo propagamos, no lo silenciamos
             
-        write_audit_log(spark, config.NAMESPACE, f"{table_name}_bronce", accion, len(records))
+        write_audit_log(spark, config.NAMESPACE, f"{table_name}_bronce", accion, df_dedup.count())
 
-        print(f"✅ {table_name} written successfully")
+        print(f"✅ {table_name} written successfully ({df_dedup.count()} records)")
 
          # Compacta ficheros pequeños
         full = f"players.{config.NAMESPACE}.{table_name}_bronce"

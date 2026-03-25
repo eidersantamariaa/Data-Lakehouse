@@ -149,24 +149,31 @@ def preview(table: str):
 def snapshots(table: str):
     if catalog is None:
         return {}
-    ns, tbl_name = table.split(".", 1)
-    t = catalog.load_table((ns, tbl_name))
-    current_id = t.current_snapshot().snapshot_id if t.current_snapshot() else None
-    snaps = []
-    for s in reversed(list(t.metadata.snapshots)):
-        sm = s.summary or {}
-        from datetime import datetime
-        ts = datetime.fromtimestamp(s.timestamp_ms / 1000).strftime("%Y-%m-%d %H:%M")
-        snaps.append({
-            "id": s.snapshot_id,
-            "ts": ts,
-            "op": sm.get("operation", "—"),
-            "add": sm.get("added-data-files", "0"),
-            "rem": sm.get("deleted-data-files", "0"),
-            "rec": sm.get("total-records", "—"),
-            "current": s.snapshot_id == current_id,
-        })
-    return {"snaps": snaps}
+    try:
+        ns, tbl_name = table.split(".", 1)
+        t = catalog.load_table((ns, tbl_name))
+        # Refresh metadata to ensure we have the latest snapshots
+        # (especially after expire_snapshots was called)
+        t.refresh()
+        current_id = t.current_snapshot().snapshot_id if t.current_snapshot() else None
+        snaps = []
+        for s in reversed(list(t.metadata.snapshots)):
+            sm = s.summary or {}
+            from datetime import datetime
+            ts = datetime.fromtimestamp(s.timestamp_ms / 1000).strftime("%Y-%m-%d %H:%M")
+            snaps.append({
+                "id": str(s.snapshot_id),  # Convert to string to preserve precision
+                "ts": ts,
+                "op": sm.get("operation", "—"),
+                "add": sm.get("added-data-files", "0"),
+                "rem": sm.get("deleted-data-files", "0"),
+                "rec": sm.get("total-records", "—"),
+                "current": s.snapshot_id == current_id,
+            })
+        return {"snaps": snaps}
+    except Exception as e:
+        print(f"❌ snapshots error: {e}")
+        return {"snaps": [], "error": str(e)}
 
 def _tt():
     if tt is None:
