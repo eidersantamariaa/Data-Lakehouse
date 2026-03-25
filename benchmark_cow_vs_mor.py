@@ -33,8 +33,8 @@ def create_tables_from_source(spark, source_table, namespace, base_name):
     cow_table = f"players.{namespace}.{base_name}_cow"
     mor_table = f"players.{namespace}.{base_name}_mor"
 
-    spark.sql(f"DROP TABLE IF EXISTS {cow_table} PURGE")
-    spark.sql(f"DROP TABLE IF EXISTS {mor_table} PURGE")
+    spark.sql(f"DROP TABLE IF EXISTS {cow_table}")
+    spark.sql(f"DROP TABLE IF EXISTS {mor_table}")
 
     spark.sql(
         f"""
@@ -100,41 +100,31 @@ def initial_load(table_name, base_df):
     return timed(f"{table_name} initial_load", _run)
 
 
-def build_updates_df(base_df, key_col, update_col, update_ratio):
-    # Spark row-level MERGE requires deterministic source expressions.
-    # Use hash-based deterministic sampling instead of rand().
+def count_update_rows(base_df, key_col, update_ratio):
     threshold = int(max(0.0, min(1.0, float(update_ratio))) * 100)
-    updates = base_df.where(F.pmod(F.abs(F.hash(F.col(key_col))), F.lit(100)) < F.lit(threshold))
+    return base_df.where(F.pmod(F.abs(F.hash(F.col(key_col))), F.lit(100)) < F.lit(threshold)).count()
 
-    dt = next(f.dataType for f in base_df.schema.fields if f.name == update_col)
 
-    if isinstance(dt, NumericType):
-        updates = updates.withColumn(update_col, F.col(update_col) + F.lit(1))
-    elif isinstance(dt, StringType):
-        updates = updates.withColumn(update_col, F.concat(F.col(update_col), F.lit("_u")))
-    elif isinstance(dt, (TimestampType, DateType)):
-        updates = updates.withColumn(update_col, F.current_timestamp())
+def update_slice(spark, table_name, key_col, update_col, update_ratio, update_type):
+    threshold = int(max(0.0, min(1.0, float(update_ratio))) * 100)
+
+    if update_type == "numeric":
+        update_expr = f"{update_col} + 1"
+    elif update_type == "string":
+        update_expr = f"concat({update_col}, '_u')"
+    elif update_type == "timestamp":
+        update_expr = "current_timestamp()"
+    elif update_type == "date":
+        update_expr = "current_date()"
     else:
-        raise ValueError(
-            f"No se puede modificar automaticamente la columna {update_col} (tipo {dt}). "
-            "Usa --update-col con una columna string/numerica/timestamp/date."
-        )
-
-    # MERGE source should contain unique keys to avoid ambiguous matches.
-    return updates.select(key_col, update_col).dropDuplicates([key_col])
-
-
-def merge_updates(spark, table_name, key_col, update_col, updates_df):
-    updates_df.createOrReplaceTempView("bench_updates")
+        raise ValueError(f"Tipo de update no soportado: {update_type}")
 
     def _run():
         spark.sql(
             f"""
-            MERGE INTO {table_name} t
-            USING bench_updates s
-            ON t.{key_col} = s.{key_col}
-            WHEN MATCHED THEN UPDATE SET
-                t.{update_col} = s.{update_col}
+            UPDATE {table_name}
+            SET {update_col} = {update_expr}
+            WHERE pmod(abs(hash({key_col})), 100) < {threshold}
             """
         )
 
@@ -189,6 +179,20 @@ def run(cli_args=None):
         )
 
     update_col = detect_update_column(source_df, args.key_col, args.update_col)
+    update_dt = next(f.dataType for f in source_df.schema.fields if f.name == update_col)
+    if isinstance(update_dt, NumericType):
+        update_type = "numeric"
+    elif isinstance(update_dt, StringType):
+        update_type = "string"
+    elif isinstance(update_dt, TimestampType):
+        update_type = "timestamp"
+    elif isinstance(update_dt, DateType):
+        update_type = "date"
+    else:
+        raise ValueError(
+            f"No se puede modificar automaticamente la columna {update_col} (tipo {update_dt}). "
+            "Usa --update-col con una columna string/numerica/timestamp/date."
+        )
     base_df = build_base_df(source_df, args.key_col, args.sample_rows).cache()
     base_rows = base_df.count()
 
@@ -199,20 +203,20 @@ def run(cli_args=None):
         spark, source_table, args.namespace, args.base_table
     )
 
-    updates_df = build_updates_df(base_df, args.key_col, update_col, args.update_ratio).cache()
-    updates_rows = updates_df.count()
+    updates_rows = count_update_rows(base_df, args.key_col, args.update_ratio)
 
     print("=== Config ===")
     print(f"source_table: {source_table}")
     print(f"key_col: {args.key_col}")
     print(f"update_col: {update_col}")
+    print(f"update_type: {update_type}")
     print(f"sample_rows: {base_rows}")
     print(f"updates_rows: {updates_rows}")
 
     results = []
     for table_name in [cow_table, mor_table]:
         results.append(initial_load(table_name, base_df))
-        results.append(merge_updates(spark, table_name, args.key_col, update_col, updates_df))
+        results.append(update_slice(spark, table_name, args.key_col, update_col, args.update_ratio, update_type))
         results.append(delete_slice(spark, table_name, args.key_col))
         results.append(read_full(spark, table_name))
 
@@ -244,8 +248,8 @@ def run(cli_args=None):
         }
 
     if not args.keep_tables:
-        spark.sql(f"DROP TABLE IF EXISTS {cow_table} PURGE")
-        spark.sql(f"DROP TABLE IF EXISTS {mor_table} PURGE")
+        spark.sql(f"DROP TABLE IF EXISTS {cow_table}")
+        spark.sql(f"DROP TABLE IF EXISTS {mor_table}")
 
     spark.stop()
 
