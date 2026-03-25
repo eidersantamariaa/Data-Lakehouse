@@ -4,10 +4,12 @@ from pyiceberg.catalog import load_catalog
 from pyiceberg.io.fsspec import FsspecFileIO
 import pyarrow as pa
 import boto3
+from timetraveling import TimeTraveler
 
 app = FastAPI()
 catalog = None
 s3_config = {}
+tt: TimeTraveler | None = None
 
 """
 endpoint=http://172.16.58.11:32688
@@ -37,6 +39,7 @@ async def connect_catalog(req: Request):
         )
         # Guarda los datos de conexión para usarlos en preview
         s3_config = data
+        tt = TimeTraveler(catalog)
 
         namespaces = catalog.list_namespaces()
         print("✅ namespaces:", namespaces)
@@ -150,6 +153,91 @@ def snapshots(table: str):
             "current": s.snapshot_id == current_id,
         })
     return {"snaps": snaps}
+
+def _tt():
+    if tt is None:
+        raise RuntimeError("Catalog no conectado")
+    return tt
+
+@app.get("/tt/read-snapshot/{table}")
+def tt_read_snapshot(table: str, snapshot_id: int, limit: int = 50):
+    """Lee datos de la tabla en un snapshot concreto."""
+    try:
+        return _tt().read_at_snapshot(table, snapshot_id, limit)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+ 
+ 
+@app.get("/tt/read-timestamp/{table}")
+def tt_read_timestamp(table: str, timestamp_ms: int, limit: int = 50):
+    """Lee datos de la tabla en un momento concreto (ms Unix)."""
+    try:
+        return _tt().read_at_timestamp(table, timestamp_ms, limit)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+ 
+ 
+@app.post("/tt/rollback-snapshot/{table}")
+async def tt_rollback_snapshot(table: str, req: Request):
+    """Rollback al snapshot indicado."""
+    try:
+        body = await req.json()
+        return _tt().rollback_to_snapshot(table, int(body["snapshot_id"]))
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+ 
+ 
+@app.post("/tt/rollback-timestamp/{table}")
+async def tt_rollback_timestamp(table: str, req: Request):
+    """Rollback al snapshot mas cercano anterior al timestamp indicado."""
+    try:
+        body = await req.json()
+        return _tt().rollback_to_timestamp(table, int(body["timestamp_ms"]))
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+ 
+ 
+@app.get("/tt/changes/{table}")
+def tt_changes(table: str, start_snapshot_id: int, end_snapshot_id: int, limit: int = 200):
+    """Devuelve registros anadidos entre dos snapshots."""
+    try:
+        return _tt().get_incremental_changes(table, start_snapshot_id, end_snapshot_id, limit)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+ 
+ 
+@app.post("/tt/expire/{table}")
+async def tt_expire(table: str, req: Request):
+    """Expira snapshots anteriores a la fecha indicada."""
+    try:
+        body = await req.json()
+        return _tt().expire_snapshots(
+            table,
+            int(body["older_than_ms"]),
+            int(body.get("retain_last", 1)),
+        )
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+ 
+ 
+@app.post("/tt/orphans/{table}")
+async def tt_orphans(table: str):
+    """Elimina archivos huerfanos de la tabla."""
+    try:
+        return _tt().remove_orphan_files(table)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+ 
+ 
+@app.get("/tt/stats/{table}")
+def tt_stats(table: str):
+    """Estadisticas del historial de snapshots."""
+    try:
+        return _tt().snapshot_stats(table)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    
+    
 
 @app.get("/", response_class=HTMLResponse)
 async def root():

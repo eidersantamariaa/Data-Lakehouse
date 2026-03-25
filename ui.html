@@ -1,505 +1,1122 @@
-<style>
-    * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0
-    }
+<!DOCTYPE html>
+<html lang="en">
 
-    .wrap {
-        position: relative;
-        border: 0.5px solid var(--color-border-tertiary);
-        border-radius: var(--border-radius-lg);
-        overflow: hidden;
-        background: var(--color-background-primary);
-        height: 640px
-    }
+<head>
+    <meta charset="UTF-8">
+    <title>iceberg explorer</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
 
-    .grid {
-        display: grid;
-        grid-template-rows: 44px 1fr;
-        grid-template-columns: 236px 1fr;
-        height: 640px
-    }
+        :root {
+            --color-background-primary: #0f1117;
+            --color-background-secondary: #181c25;
+            --color-background-success: rgba(29, 158, 117, .13);
+            --color-background-info: rgba(56, 139, 253, .13);
+            --color-background-warning: rgba(210, 153, 34, .13);
+            --color-background-danger: rgba(220, 80, 80, .13);
+            --color-text-primary: #e6edf3;
+            --color-text-secondary: #7d8590;
+            --color-text-success: #3fb950;
+            --color-text-info: #79c0ff;
+            --color-text-warning: #d29922;
+            --color-text-danger: #f85149;
+            --color-border-tertiary: rgba(255, 255, 255, .07);
+            --color-border-secondary: rgba(255, 255, 255, .12);
+            --color-border-success: rgba(29, 158, 117, .4);
+            --border-radius-md: 6px;
+            --border-radius-lg: 10px;
+            --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+        }
 
-    .hdr {
-        grid-column: 1/-1;
-        display: flex;
-        align-items: center;
-        padding: 0 14px;
-        border-bottom: 0.5px solid var(--color-border-tertiary);
-        gap: 8px
-    }
+        body {
+            background: #080b10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: var(--font-mono);
+        }
 
-    .sidebar {
-        border-right: 0.5px solid var(--color-border-tertiary);
-        overflow-y: auto
-    }
+        button {
+            background: var(--color-background-secondary);
+            color: var(--color-text-secondary);
+            border: 0.5px solid var(--color-border-secondary);
+            border-radius: var(--border-radius-md);
+            padding: 5px 12px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all .15s;
+        }
 
-    .main {
-        overflow: hidden;
-        display: flex;
-        flex-direction: column
-    }
+        button:hover {
+            color: var(--color-text-primary);
+            border-color: rgba(255, 255, 255, .2);
+        }
 
-    .ns {
-        padding: 10px 12px 4px;
-        font-size: 10px;
-        color: var(--color-text-secondary);
-        font-family: var(--font-mono);
-        letter-spacing: .08em;
-        text-transform: uppercase;
-        display: flex;
-        align-items: center;
-        gap: 6px
-    }
+        button:active {
+            opacity: .75;
+        }
 
-    .titem {
-        display: flex;
-        align-items: center;
-        gap: 7px;
-        padding: 6px 14px;
-        cursor: pointer;
-        font-family: var(--font-mono);
-        font-size: 12px;
-        color: var(--color-text-secondary);
-        border-left: 2px solid transparent
-    }
+        button:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+        }
 
-    .titem:hover {
-        background: var(--color-background-secondary);
-        color: var(--color-text-primary)
-    }
+        input,
+        select {
+            background: var(--color-background-secondary);
+            color: var(--color-text-primary);
+            border: 0.5px solid var(--color-border-secondary);
+            border-radius: var(--border-radius-md);
+            padding: 6px 10px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            outline: none;
+            transition: border-color .15s;
+        }
 
-    .titem.sel {
-        background: var(--color-background-secondary);
-        color: var(--color-text-primary);
-        border-left-color: #1D9E75
-    }
+        input:focus,
+        select:focus {
+            border-color: #1D9E75;
+        }
 
-    .tabs {
-        display: flex;
-        border-bottom: 0.5px solid var(--color-border-tertiary);
-        padding: 0 16px;
-        flex-shrink: 0
-    }
+        input::placeholder {
+            color: var(--color-text-secondary);
+            opacity: .6;
+        }
 
-    .tab {
-        padding: 10px 14px;
-        font-size: 12px;
-        font-family: var(--font-mono);
-        cursor: pointer;
-        color: var(--color-text-secondary);
-        border-bottom: 2px solid transparent;
-        margin-bottom: -1px;
-        white-space: nowrap
-    }
+        .wrap {
+            position: relative;
+            border: 0.5px solid var(--color-border-tertiary);
+            border-radius: var(--border-radius-lg);
+            overflow: hidden;
+            background: var(--color-background-primary);
+            width: 900px;
+            height: 640px;
+        }
 
-    .tab.on {
-        color: var(--color-text-primary);
-        border-bottom-color: #1D9E75
-    }
+        .grid {
+            display: grid;
+            grid-template-rows: 44px 1fr;
+            grid-template-columns: 236px 1fr;
+            height: 640px;
+        }
 
-    .content {
-        padding: 16px;
-        flex: 1;
-        overflow: auto
-    }
+        .hdr {
+            grid-column: 1/-1;
+            display: flex;
+            align-items: center;
+            padding: 0 14px;
+            border-bottom: 0.5px solid var(--color-border-tertiary);
+            gap: 8px;
+        }
 
-    .badge {
-        display: inline-block;
-        padding: 2px 6px;
-        border-radius: 3px;
-        font-size: 11px;
-        font-family: var(--font-mono)
-    }
+        .sidebar {
+            border-right: 0.5px solid var(--color-border-tertiary);
+            overflow-y: auto;
+        }
 
-    .t-num {
-        background: var(--color-background-success);
-        color: var(--color-text-success)
-    }
+        .main {
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
 
-    .t-str {
-        background: var(--color-background-info);
-        color: var(--color-text-info)
-    }
+        .ns {
+            padding: 10px 12px 4px;
+            font-size: 10px;
+            color: var(--color-text-secondary);
+            font-family: var(--font-mono);
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
 
-    .t-dbl {
-        background: var(--color-background-warning);
-        color: var(--color-text-warning)
-    }
+        .titem {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 6px 14px;
+            cursor: pointer;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--color-text-secondary);
+            border-left: 2px solid transparent;
+        }
 
-    .t-ts {
-        background: var(--color-background-secondary);
-        color: var(--color-text-secondary)
-    }
+        .titem:hover {
+            background: var(--color-background-secondary);
+            color: var(--color-text-primary);
+        }
 
-    .t-bool {
-        background: var(--color-background-danger);
-        color: var(--color-text-danger)
-    }
+        .titem.sel {
+            background: var(--color-background-secondary);
+            color: var(--color-text-primary);
+            border-left-color: #1D9E75;
+        }
 
-    .meta-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-        margin-bottom: 14px
-    }
+        .tabs {
+            display: flex;
+            border-bottom: 0.5px solid var(--color-border-tertiary);
+            padding: 0 16px;
+            flex-shrink: 0;
+        }
 
-    .mc {
-        background: var(--color-background-secondary);
-        border-radius: var(--border-radius-md);
-        padding: 10px 12px
-    }
+        .tab {
+            padding: 10px 14px;
+            font-size: 12px;
+            font-family: var(--font-mono);
+            cursor: pointer;
+            color: var(--color-text-secondary);
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            white-space: nowrap;
+        }
 
-    .ml {
-        font-size: 10px;
-        color: var(--color-text-secondary);
-        font-family: var(--font-mono);
-        text-transform: uppercase;
-        letter-spacing: .06em;
-        margin-bottom: 3px
-    }
+        .tab.on {
+            color: var(--color-text-primary);
+            border-bottom-color: #1D9E75;
+        }
 
-    .mv {
-        font-size: 13px;
-        font-family: var(--font-mono);
-        color: var(--color-text-primary);
-        font-weight: 500
-    }
+        .tab.tt-tab.on {
+            border-bottom-color: #6e8cff;
+            color: #6e8cff;
+        }
 
-    .srow {
-        display: grid;
-        grid-template-columns: 22px 1fr 100px 60px;
-        gap: 10px;
-        padding: 6px 0;
-        border-bottom: 0.5px solid var(--color-border-tertiary);
-        align-items: center;
-        font-size: 12px;
-        font-family: var(--font-mono)
-    }
+        .content {
+            padding: 16px;
+            flex: 1;
+            overflow: auto;
+        }
 
-    .srow-h {
-        font-size: 10px;
-        color: var(--color-text-secondary);
-        padding-bottom: 4px;
-        border-bottom: 0.5px solid var(--color-border-secondary)
-    }
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-family: var(--font-mono);
+        }
 
-    .dtbl {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 12px;
-        font-family: var(--font-mono)
-    }
+        .t-num {
+            background: var(--color-background-success);
+            color: var(--color-text-success);
+        }
 
-    .dtbl th {
-        text-align: left;
-        padding: 6px 10px;
-        border-bottom: 0.5px solid var(--color-border-tertiary);
-        color: var(--color-text-secondary);
-        font-weight: 400;
-        white-space: nowrap;
-        background: var(--color-background-primary)
-    }
+        .t-str {
+            background: var(--color-background-info);
+            color: var(--color-text-info);
+        }
 
-    .dtbl td {
-        padding: 5px 10px;
-        border-bottom: 0.5px solid var(--color-border-tertiary);
-        color: var(--color-text-primary);
-        white-space: nowrap
-    }
+        .t-dbl {
+            background: var(--color-background-warning);
+            color: var(--color-text-warning);
+        }
 
-    .dtbl tr:hover td {
-        background: var(--color-background-secondary)
-    }
+        .t-ts {
+            background: var(--color-background-secondary);
+            color: var(--color-text-secondary);
+        }
 
-    .null {
-        color: var(--color-text-secondary);
-        font-style: italic
-    }
+        .t-bool {
+            background: var(--color-background-danger);
+            color: var(--color-text-danger);
+        }
 
-    .snap {
-        padding: 10px 0;
-        border-bottom: 0.5px solid var(--color-border-tertiary);
-        font-size: 12px;
-        font-family: var(--font-mono)
-    }
+        .meta-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
 
-    .empty {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 100%;
-        color: var(--color-text-secondary);
-        gap: 10px;
-        font-family: var(--font-mono);
-        font-size: 12px
-    }
+        .mc {
+            background: var(--color-background-secondary);
+            border-radius: var(--border-radius-md);
+            padding: 10px 12px;
+        }
 
-    .ov {
-        position: absolute;
-        inset: 0;
-        display: none;
-        background: rgba(0, 0, 0, .4);
-        z-index: 10;
-        align-items: center;
-        justify-content: center
-    }
+        .ml {
+            font-size: 10px;
+            color: var(--color-text-secondary);
+            font-family: var(--font-mono);
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            margin-bottom: 3px;
+        }
 
-    .ov.on {
-        display: flex
-    }
+        .mv {
+            font-size: 13px;
+            font-family: var(--font-mono);
+            color: var(--color-text-primary);
+            font-weight: 500;
+        }
 
-    .modal {
-        background: var(--color-background-primary);
-        border: 0.5px solid var(--color-border-secondary);
-        border-radius: var(--border-radius-lg);
-        padding: 22px;
-        width: 340px
-    }
+        .srow {
+            display: grid;
+            grid-template-columns: 22px 1fr 100px 60px;
+            gap: 10px;
+            padding: 6px 0;
+            border-bottom: 0.5px solid var(--color-border-tertiary);
+            align-items: center;
+            font-size: 12px;
+            font-family: var(--font-mono);
+        }
 
-    .modal h3 {
-        font-size: 13px;
-        font-weight: 500;
-        margin-bottom: 14px;
-        font-family: var(--font-mono)
-    }
+        .srow-h {
+            font-size: 10px;
+            color: var(--color-text-secondary);
+            padding-bottom: 4px;
+            border-bottom: 0.5px solid var(--color-border-secondary);
+        }
 
-    .flabel {
-        font-size: 11px;
-        color: var(--color-text-secondary);
-        font-family: var(--font-mono);
-        display: block;
-        margin-bottom: 3px
-    }
+        .dtbl {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            font-family: var(--font-mono);
+        }
 
-    .finput {
-        width: 100%;
-        margin-bottom: 10px;
-        font-family: var(--font-mono);
-        font-size: 12px
-    }
+        .dtbl th {
+            text-align: left;
+            padding: 6px 10px;
+            border-bottom: 0.5px solid var(--color-border-tertiary);
+            color: var(--color-text-secondary);
+            font-weight: 400;
+            white-space: nowrap;
+            background: var(--color-background-primary);
+        }
 
-    .dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 50%;
-        flex-shrink: 0
-    }
+        .dtbl td {
+            padding: 5px 10px;
+            border-bottom: 0.5px solid var(--color-border-tertiary);
+            color: var(--color-text-primary);
+            white-space: nowrap;
+        }
 
-    .loc {
-        font-size: 11px;
-        color: var(--color-text-secondary);
-        font-family: var(--font-mono);
-        margin-bottom: 12px;
-        padding: 6px 8px;
-        background: var(--color-background-secondary);
-        border-radius: var(--border-radius-md)
-    }
-</style>
+        .dtbl tr:hover td {
+            background: var(--color-background-secondary);
+        }
 
-<div class="wrap">
-    <div class="ov" id="ov">
-        <div class="modal">
-            <h3>connect to garage s3</h3>
-            <label class="flabel">endpoint url</label>
-            <input class="finput" type="text" id="f-ep" placeholder="https://s3.garage.example.com" />
-            <label class="flabel">access key id</label>
-            <input class="finput" type="text" id="f-ak" placeholder="GKxxxxxxxxxxxxxxxxxxxx" />
-            <label class="flabel">secret access key</label>
-            <input class="finput" type="password" id="f-sk" placeholder="••••••••••••••••••••••••" />
-            <label class="flabel">bucket</label>
-            <input class="finput" type="text" id="f-bk" placeholder="warehouse" />
-            <label class="flabel">warehouse prefix (optional)</label>
-            <input class="finput" type="text" id="f-wp" placeholder="iceberg/" />
-            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
-                <button onclick="closeOv()">cancel</button>
-                <button onclick="doConnect()"
-                    style="background:var(--color-background-success);color:var(--color-text-success);border-color:var(--color-border-success)">connect</button>
+        .null {
+            color: var(--color-text-secondary);
+            font-style: italic;
+        }
+
+        .snap {
+            padding: 10px 0;
+            border-bottom: 0.5px solid var(--color-border-tertiary);
+            font-size: 12px;
+            font-family: var(--font-mono);
+        }
+
+        .empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--color-text-secondary);
+            gap: 10px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+        }
+
+        .loc {
+            font-size: 11px;
+            color: var(--color-text-secondary);
+            font-family: var(--font-mono);
+            margin-bottom: 12px;
+            padding: 6px 8px;
+            background: var(--color-background-secondary);
+            border-radius: var(--border-radius-md);
+        }
+
+        .dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        /* Modal */
+        .ov {
+            position: absolute;
+            inset: 0;
+            display: none;
+            background: rgba(0, 0, 0, .55);
+            z-index: 10;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ov.on {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--color-background-primary);
+            border: 0.5px solid var(--color-border-secondary);
+            border-radius: var(--border-radius-lg);
+            padding: 22px;
+            width: 340px;
+        }
+
+        .modal h3 {
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 14px;
+        }
+
+        .flabel {
+            font-size: 11px;
+            color: var(--color-text-secondary);
+            display: block;
+            margin-bottom: 3px;
+        }
+
+        .finput {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        /* ── Time Travel styles ── */
+        .tt-modes {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .tt-mode-btn {
+            padding: 4px 12px;
+            font-size: 11px;
+            border-radius: 20px;
+            border: 0.5px solid var(--color-border-secondary);
+            background: transparent;
+            color: var(--color-text-secondary);
+            cursor: pointer;
+            transition: all .15s;
+        }
+
+        .tt-mode-btn:hover {
+            color: var(--color-text-primary);
+        }
+
+        .tt-mode-btn.on {
+            background: rgba(110, 140, 255, .15);
+            color: #6e8cff;
+            border-color: rgba(110, 140, 255, .4);
+        }
+
+        .tt-panel {
+            display: none;
+        }
+
+        .tt-panel.on {
+            display: block;
+        }
+
+        .tt-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .tt-label {
+            font-size: 11px;
+            color: var(--color-text-secondary);
+            min-width: 80px;
+        }
+
+        .tt-result {
+            margin-top: 14px;
+        }
+
+        .tt-result-hdr {
+            font-size: 10px;
+            color: var(--color-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tt-result-hdr span.ok {
+            color: var(--color-text-success);
+            font-size: 11px;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+
+        .tt-result-hdr span.err {
+            color: var(--color-text-danger);
+            font-size: 11px;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+
+        .warn-box {
+            background: rgba(210, 153, 34, .08);
+            border: 0.5px solid rgba(210, 153, 34, .3);
+            border-radius: var(--border-radius-md);
+            padding: 8px 12px;
+            font-size: 11px;
+            color: var(--color-text-warning);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+        }
+
+        .snap-pick {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+
+        .snap-pick-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 10px;
+            border-radius: var(--border-radius-md);
+            border: 0.5px solid transparent;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all .12s;
+        }
+
+        .snap-pick-item:hover {
+            background: var(--color-background-secondary);
+        }
+
+        .snap-pick-item.sel {
+            background: rgba(110, 140, 255, .1);
+            border-color: rgba(110, 140, 255, .3);
+        }
+
+        .snap-pick-item .sid {
+            color: var(--color-text-secondary);
+            font-size: 11px;
+            flex: 1;
+        }
+
+        .snap-pick-item .sts {
+            font-size: 11px;
+            color: var(--color-text-secondary);
+            margin-left: auto;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .stat-card {
+            background: var(--color-background-secondary);
+            border-radius: var(--border-radius-md);
+            padding: 10px 12px;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: var(--color-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            margin-bottom: 4px;
+        }
+
+        .stat-val {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--color-text-primary);
+        }
+
+        .ops-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            background: var(--color-background-secondary);
+            margin-right: 4px;
+        }
+
+        .spinning {
+            display: inline-block;
+            animation: spin .7s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .tt-btn-success {
+            background: var(--color-background-success);
+            color: var(--color-text-success);
+            border-color: var(--color-border-success);
+        }
+
+        .tt-btn-danger {
+            background: var(--color-background-danger);
+            color: var(--color-text-danger);
+            border-color: rgba(248, 81, 73, .35);
+        }
+
+        .tt-btn-info {
+            background: var(--color-background-info);
+            color: var(--color-text-info);
+            border-color: rgba(79, 140, 255, .35);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+
+        <!-- Connect modal -->
+        <div class="ov" id="ov">
+            <div class="modal">
+                <h3>connect to garage s3</h3>
+                <label class="flabel">endpoint url</label>
+                <input class="finput" type="text" id="f-ep" placeholder="https://s3.garage.example.com" />
+                <label class="flabel">access key id</label>
+                <input class="finput" type="text" id="f-ak" placeholder="GKxxxxxxxxxxxxxxxxxxxx" />
+                <label class="flabel">secret access key</label>
+                <input class="finput" type="password" id="f-sk" placeholder="••••••••••••••••••••••••" />
+                <label class="flabel">bucket</label>
+                <input class="finput" type="text" id="f-bk" placeholder="warehouse" />
+                <label class="flabel">warehouse prefix (optional)</label>
+                <input class="finput" type="text" id="f-wp" placeholder="iceberg/" />
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+                    <button onclick="closeOv()">cancel</button>
+                    <button class="tt-btn-success" onclick="doConnect()">connect</button>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="grid">
-        <div class="hdr">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M3 6l9-3 9 3v12l-9 3-9-3V6z" />
-                <path d="M12 3v18M3 6l9 3 9-3" />
-            </svg>
-            <span style="font-family:var(--font-mono);font-size:13px;font-weight:500">iceberg explorer</span>
-            <div style="flex:1"></div>
-            <div
-                style="display:flex;align-items:center;gap:5px;font-size:11px;font-family:var(--font-mono);color:var(--color-text-secondary)">
-                <div class="dot" id="dot" style="background:var(--color-text-warning)"></div>
-                <span id="clbl">demo mode</span>
+        <div class="grid">
+
+            <!-- Header -->
+            <div class="hdr">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M3 6l9-3 9 3v12l-9 3-9-3V6z" />
+                    <path d="M12 3v18M3 6l9 3 9-3" />
+                </svg>
+                <span style="font-size:13px;font-weight:500">iceberg explorer</span>
+                <div style="flex:1"></div>
+                <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--color-text-secondary)">
+                    <div class="dot" id="dot" style="background:var(--color-text-warning)"></div>
+                    <span id="clbl">demo mode</span>
+                </div>
+                <button onclick="showOv()" style="font-size:11px;padding:4px 10px;margin-left:10px">connect</button>
             </div>
-            <button onclick="showOv()"
-                style="font-family:var(--font-mono);font-size:11px;padding:4px 10px;margin-left:10px">connect</button>
-        </div>
 
-        <div class="sidebar" id="sidebar"></div>
+            <!-- Sidebar -->
+            <div class="sidebar" id="sidebar"></div>
 
-        <div class="main">
-            <div class="tabs" id="tabs" style="display:none">
-                <div class="tab on" onclick="switchTab('schema',this)">schema</div>
-                <div class="tab" onclick="switchTab('data',this)">preview</div>
-                <div class="tab" onclick="switchTab('snapshots',this)">snapshots</div>
-            </div>
-            <div class="content" id="content">
-                <div class="empty">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"
-                        opacity="0.35">
-                        <path d="M3 6l9-3 9 3v12l-9 3-9-3V6z" />
-                        <path d="M12 3v18M3 6l9 3 9-3" />
-                    </svg>
-                    <span>select a table to explore</span>
+            <!-- Main -->
+            <div class="main">
+                <div class="tabs" id="tabs" style="display:none">
+                    <div class="tab on" onclick="switchTab('schema',this)">schema</div>
+                    <div class="tab" onclick="switchTab('data',this)">preview</div>
+                    <div class="tab" onclick="switchTab('snapshots',this)">snapshots</div>
+                    <div class="tab tt-tab" onclick="switchTab('timetravel',this)">⏱ time travel</div>
+                </div>
+                <div class="content" id="content">
+                    <div class="empty">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1" opacity="0.35">
+                            <path d="M3 6l9-3 9 3v12l-9 3-9-3V6z" />
+                            <path d="M12 3v18M3 6l9 3 9-3" />
+                        </svg>
+                        <span>select a table to explore</span>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <script>
+        let T = {}, sel = null, curTab = 'schema';
+        const typeClass = { long: 't-num', int: 't-num', string: 't-str', double: 't-dbl', timestamp: 't-ts', boolean: 't-bool' };
+        const fmt = n => Number(n).toLocaleString();
+        const badge = t => `<span class="badge ${typeClass[t] || 't-str'}">${t}</span>`;
+        const esc = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+        // ── Sidebar ────────────────────────────────────────────────────────────────
+
+        function renderSidebar() {
+            const ns = {};
+            Object.keys(T).forEach(k => { const [n, t] = k.split('.'); (ns[n] = ns[n] || []).push({ k, t }); });
+            let h = '';
+            Object.entries(ns).forEach(([n, tables]) => {
+                h += `<div class="ns"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-4 0v2"/></svg>${n}</div>`;
+                tables.forEach(({ k, t }) => {
+                    h += `<div class="titem${sel === k ? ' sel' : ''}" onclick="pick('${k}')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 9v12"/></svg>
+                ${t}</div>`;
+                });
+            });
+            document.getElementById('sidebar').innerHTML = h || '<div class="ns">no tables</div>';
+        }
+
+        // ── Load data ──────────────────────────────────────────────────────────────
+
+        async function loadTables() {
+            const r = await fetch('/tables'); T = {};
+            (await r.json()).forEach(t => T[t] = {}); renderSidebar();
+        }
+
+        async function pick(k) {
+            sel = k; curTab = 'schema';
+            const [schema, preview, snapsData] = await Promise.all([
+                fetch(`/schema/${k}`).then(r => r.json()),
+                fetch(`/preview/${k}`).then(r => r.json()),
+                fetch(`/snapshots/${k}`).then(r => r.json()),
+            ]);
+            T[k] = { ...schema, preview: preview.preview || [], snap: preview.snap || '—', snaps: snapsData.snaps || [] };
+            document.getElementById('tabs').style.display = 'flex';
+            renderSidebar(); renderContent();
+        }
+
+        // ── Render tabs ────────────────────────────────────────────────────────────
+
+        function renderContent() {
+            if (!sel) return;
+            const d = T[sel];
+            if (curTab === 'schema') document.getElementById('content').innerHTML = renderSchema(d);
+            else if (curTab === 'data') document.getElementById('content').innerHTML = renderData(d);
+            else if (curTab === 'snapshots') document.getElementById('content').innerHTML = renderSnaps(d);
+            else if (curTab === 'timetravel') document.getElementById('content').innerHTML = renderTimeTravel(d);
+        }
+
+        function switchTab(t, el) {
+            curTab = t;
+            document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+            el.classList.add('on');
+            renderContent();
+        }
+
+        function renderSchema(d) {
+            const rows = d.schema.map(f => `
+        <div class="srow">
+            <span style="color:var(--color-text-secondary);font-size:11px">${f.id}</span>
+            <span>${f.n}</span>
+            ${badge(f.t)}
+            <span style="font-size:11px;color:${f.req ? 'var(--color-text-success)' : 'var(--color-text-secondary)'}">${f.req ? 'req' : ''}</span>
+        </div>`).join('');
+            return `
+        <div class="meta-grid">
+            <div class="mc"><div class="ml">rows</div><div class="mv">${fmt(d.rows)}</div></div>
+            <div class="mc"><div class="ml">data files</div><div class="mv">${fmt(d.files)}</div></div>
+            <div class="mc"><div class="ml">size</div><div class="mv">${d.size}</div></div>
+            <div class="mc"><div class="ml">partition</div><div class="mv" style="font-size:11px">${d.part}</div></div>
+        </div>
+        <div class="loc">📍 ${d.loc}</div>
+        <div class="srow srow-h"><span></span><span>field</span><span>type</span><span>req</span></div>
+        ${rows}`;
+        }
+
+        function renderData(d) {
+            const cols = d.schema.map(f => f.n);
+            const ths = cols.map(c => `<th>${c}</th>`).join('');
+            const trs = d.preview.map(row => `<tr>${cols.map(c => {
+                const v = row[c]; return v === null ? `<td><span class="null">null</span></td>` : `<td>${esc(v)}</td>`;
+            }).join('')}</tr>`).join('');
+            return `<div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:10px">showing 5 of ${fmt(d.rows)} rows &nbsp;·&nbsp; snapshot ${d.snap}</div>
+        <div style="overflow-x:auto"><table class="dtbl"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
+        }
+
+        function renderSnaps(d) {
+            return d.snaps.map((s, i) => `
+        <div class="snap">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+                ${s.current ? '<span class="badge" style="background:var(--color-background-success);color:var(--color-text-success)">current</span>' : ''}
+                <span style="color:var(--color-text-secondary)">snap #${s.id}</span>
+                <span style="margin-left:auto;color:var(--color-text-secondary)">${s.ts}</span>
+            </div>
+            <div style="display:flex;gap:16px;flex-wrap:wrap">
+                <span style="color:var(--color-text-secondary)">op: <b style="color:var(--color-text-primary);font-weight:400">${s.op}</b></span>
+                <span style="color:var(--color-text-secondary)">added: <b style="font-weight:400;color:var(--color-text-primary)">${s.add}</b></span>
+                <span style="color:var(--color-text-secondary)">removed: <b style="font-weight:400;color:var(--color-text-primary)">${s.rem}</b></span>
+                <span style="color:var(--color-text-secondary)">records: <b style="font-weight:400;color:var(--color-text-success)">${s.rec}</b></span>
+            </div>
+        </div>`).join('');
+        }
+
+        // ── Time Travel UI ─────────────────────────────────────────────────────────
+
+        function renderTimeTravel(d) {
+            const snapOpts = d.snaps.map(s => `<option value="${s.id}">[${s.ts}] ${s.id} ${s.current ? '← current' : ''}</option>`).join('');
+            return `
+<div class="tt-modes">
+    <button class="tt-mode-btn on" onclick="ttMode('read',this)">read version</button>
+    <button class="tt-mode-btn" onclick="ttMode('rollback',this)">rollback</button>
+    <button class="tt-mode-btn" onclick="ttMode('changes',this)">incremental changes</button>
+    <button class="tt-mode-btn" onclick="ttMode('maintenance',this)">maintenance</button>
 </div>
 
-<script>
-    let T = {};
+<!-- ── PANEL: read version ── -->
+<div class="tt-panel on" id="tt-read">
+    <div class="tt-row">
+        <span class="tt-label">by</span>
+        <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer">
+            <input type="radio" name="tt-read-mode" value="snapshot" checked onchange="ttReadModeChange(this)"> snapshot id
+        </label>
+        <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer">
+            <input type="radio" name="tt-read-mode" value="timestamp" onchange="ttReadModeChange(this)"> timestamp
+        </label>
+    </div>
+    <div class="tt-row" id="tt-read-snap-row">
+        <span class="tt-label">snapshot</span>
+        <select id="tt-read-snap" style="flex:1;max-width:360px">${snapOpts}</select>
+    </div>
+    <div class="tt-row" id="tt-read-ts-row" style="display:none">
+        <span class="tt-label">datetime</span>
+        <input type="datetime-local" id="tt-read-ts" style="flex:1;max-width:280px">
+    </div>
+    <div class="tt-row">
+        <span class="tt-label">limit</span>
+        <input type="number" id="tt-read-limit" value="50" style="width:70px">
+        <button class="tt-btn-info" onclick="doReadVersion()">load preview</button>
+    </div>
+    <div class="tt-result" id="tt-read-result"></div>
+</div>
 
-    async function loadTables() {
-        const res = await fetch("/tables")
-        const tables = await res.json()
+<!-- ── PANEL: rollback ── -->
+<div class="tt-panel" id="tt-rollback">
+    <div class="warn-box">
+        ⚠ rollback cambia el snapshot actual de la tabla. esta operacion no se puede deshacer desde la UI.
+    </div>
+    <div class="tt-row">
+        <span class="tt-label">by</span>
+        <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer">
+            <input type="radio" name="tt-rb-mode" value="snapshot" checked onchange="ttRbModeChange(this)"> snapshot id
+        </label>
+        <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer">
+            <input type="radio" name="tt-rb-mode" value="timestamp" onchange="ttRbModeChange(this)"> timestamp
+        </label>
+    </div>
+    <div id="tt-rb-snap-row" class="tt-row">
+        <span class="tt-label">target</span>
+        <select id="tt-rb-snap" style="flex:1;max-width:360px">${snapOpts}</select>
+    </div>
+    <div id="tt-rb-ts-row" class="tt-row" style="display:none">
+        <span class="tt-label">datetime</span>
+        <input type="datetime-local" id="tt-rb-ts" style="flex:1;max-width:280px">
+    </div>
+    <div class="tt-row">
+        <button class="tt-btn-danger" onclick="doRollback()">rollback table</button>
+    </div>
+    <div class="tt-result" id="tt-rb-result"></div>
+</div>
 
-        T = {}
+<!-- ── PANEL: incremental changes ── -->
+<div class="tt-panel" id="tt-changes">
+    <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:12px">
+        muestra los registros añadidos entre dos snapshots (append scan incremental).
+    </div>
+    <div class="tt-row">
+        <span class="tt-label">from snap</span>
+        <select id="tt-ch-from" style="flex:1;max-width:320px">${snapOpts}</select>
+    </div>
+    <div class="tt-row">
+        <span class="tt-label">to snap</span>
+        <select id="tt-ch-to" style="flex:1;max-width:320px">${snapOpts}</select>
+    </div>
+    <div class="tt-row">
+        <span class="tt-label">limit</span>
+        <input type="number" id="tt-ch-limit" value="200" style="width:70px">
+        <button class="tt-btn-info" onclick="doChanges()">compute changes</button>
+    </div>
+    <div class="tt-result" id="tt-ch-result"></div>
+</div>
 
-        tables.forEach(t => {
-            T[t] = {}
-        })
+<!-- ── PANEL: maintenance ── -->
+<div class="tt-panel" id="tt-maintenance">
+    <!-- Stats card -->
+    <div id="tt-stats-area" style="margin-bottom:14px">
+        <button onclick="loadStats()" style="font-size:11px">load snapshot stats</button>
+    </div>
 
-        renderSidebar()
-    }
+    <!-- Expire -->
+    <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:12px;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:500;margin-bottom:8px;color:var(--color-text-primary)">expire snapshots</div>
+        <div class="warn-box" style="margin-bottom:8px">
+            ⚠ los snapshots expirados no podran usarse para time travel.
+        </div>
+        <div class="tt-row">
+            <span class="tt-label">older than</span>
+            <input type="datetime-local" id="tt-exp-ts" style="flex:1;max-width:240px">
+        </div>
+        <div class="tt-row">
+            <span class="tt-label">retain last</span>
+            <input type="number" id="tt-exp-retain" value="3" min="1" style="width:60px">
+            <button class="tt-btn-danger" onclick="doExpire()">expire snapshots</button>
+        </div>
+        <div class="tt-result" id="tt-exp-result"></div>
+    </div>
 
-    async function loadSchema(table) {
-        const res = await fetch(`/schema/${table}`)
-        return await res.json()
-    }
-
-    let sel = null, tab = 'schema';
-    const typeClass = { long: 't-num', int: 't-num', string: 't-str', double: 't-dbl', timestamp: 't-ts', boolean: 't-bool' };
-
-    function fmt(n) { return n.toLocaleString() }
-
-    function badge(t) { return `<span class="badge ${typeClass[t] || 't-str'}">${t}</span>` }
-
-    function renderSidebar() {
-        const ns = {};
-        Object.keys(T).forEach(k => { const [n, t] = k.split('.'); (ns[n] = ns[n] || []).push({ k, t }) });
-        let h = '';
-        Object.entries(ns).forEach(([n, tables]) => {
-            h += `<div class="ns"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-4 0v2"/></svg>${n}</div>`;
-            tables.forEach(({ k, t }) => {
-                const s = sel === k ? ' sel' : '';
-                h += `<div class="titem${s}" onclick="pick('${k}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 9v12"/></svg>${t}</div>`;
-            });
-        });
-        document.getElementById('sidebar').innerHTML = h;
-    }
-
-    function renderSchema(d) {
-        const rows = d.schema.map(f => `<div class="srow"><span style="color:var(--color-text-secondary);font-size:11px">${f.id}</span><span>${f.n}</span>${badge(f.t)}<span style="font-size:11px;color:${f.req ? 'var(--color-text-success)' : 'var(--color-text-secondary)'}">${f.req ? 'req' : ''}</span></div>`).join('');
-        return `<div class="meta-grid"><div class="mc"><div class="ml">rows</div><div class="mv">${fmt(d.rows)}</div></div><div class="mc"><div class="ml">data files</div><div class="mv">${fmt(d.files)}</div></div><div class="mc"><div class="ml">size</div><div class="mv">${d.size}</div></div><div class="mc"><div class="ml">partition</div><div class="mv" style="font-size:11px">${d.part}</div></div></div><div class="loc">📍 ${d.loc}</div><div class="srow srow-h"><span></span><span>field</span><span>type</span><span>req</span></div>${rows}`;
-    }
-
-    function renderData(d) {
-        const cols = d.schema.map(f => f.n);
-        const ths = cols.map(c => `<th>${c}</th>`).join('');
-        const trs = d.preview.map(row => `<tr>${cols.map(c => { const v = row[c]; return v === null ? `<td><span class="null">null</span></td>` : `<td>${v}</td>` }).join('')}</tr>`).join('');
-        return `<div style="font-size:11px;color:var(--color-text-secondary);font-family:var(--font-mono);margin-bottom:10px">showing 5 of ${fmt(d.rows)} rows &nbsp;·&nbsp; snapshot ${d.snap}</div><div style="overflow-x:auto"><table class="dtbl"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
-    }
-
-    function renderSnaps(d) {
-        return d.snaps.map((s, i) => `<div class="snap"><div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">${i === 0 ? `<span class="badge" style="background:var(--color-background-success);color:var(--color-text-success)">current</span>` : ''}<span style="color:var(--color-text-secondary)">snap #${s.id}</span><span style="margin-left:auto;color:var(--color-text-secondary)">${s.ts}</span></div><div style="display:flex;gap:16px"><span style="color:var(--color-text-secondary)">op: <b style="color:var(--color-text-primary);font-weight:400">${s.op}</b></span><span style="color:var(--color-text-secondary)">added: <b style="color:var(--color-text-primary);font-weight:400">${s.add}</b></span><span style="color:var(--color-text-secondary)">removed: <b style="color:var(--color-text-primary);font-weight:400">${s.rem}</b></span><span style="color:var(--color-text-secondary)">records: <b style="color:var(--color-text-success);font-weight:400">${s.rec}</b></span></div></div>`).join('');
-    }
-
-    async function loadPreview(table) {
-        const res = await fetch(`/preview/${table}`)
-        return await res.json()
-    }
-
-    async function loadSnaps(table) {
-        const res = await fetch(`/snapshots/${table}`)
-        return await res.json()
-    }
-
-    async function pick(k) {
-        sel = k
-        tab = 'schema'
-
-        const schema = await loadSchema(k)
-        const preview = await loadPreview(k)
-        const snapsData = await loadSnaps(k)
-
-        T[k] = {
-            ...schema,
-            preview: preview.preview || [],
-            snap: preview.snap || "—",
-            snaps: snapsData.snaps || []
+    <!-- Orphan files -->
+    <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:12px">
+        <div style="font-size:11px;font-weight:500;margin-bottom:6px;color:var(--color-text-primary)">remove orphan files</div>
+        <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:8px">
+            elimina archivos de datos no referenciados por ningun snapshot.
+        </div>
+        <button class="tt-btn-danger" onclick="doOrphans()">remove orphan files</button>
+        <div class="tt-result" id="tt-orp-result"></div>
+    </div>
+</div>`;
         }
 
-        document.getElementById('tabs').style.display = 'flex'
-        renderSidebar()
-        renderContent()
-    }
+        // ── Time Travel mode toggle ────────────────────────────────────────────────
 
-    function renderContent() {
-        if (!sel) return;
-        const d = T[sel];
-        let h = '';
-        if (tab === 'schema') h = renderSchema(d);
-        else if (tab === 'data') h = renderData(d);
-        else h = renderSnaps(d);
-        document.getElementById('content').innerHTML = h;
-    }
+        function ttMode(m, el) {
+            document.querySelectorAll('.tt-mode-btn').forEach(b => b.classList.remove('on'));
+            el.classList.add('on');
+            document.querySelectorAll('.tt-panel').forEach(p => p.classList.remove('on'));
+            document.getElementById('tt-' + m).classList.add('on');
+        }
 
-    function switchTab(t, el) {
-        tab = t;
-        document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
-        el.classList.add('on');
-        renderContent();
-    }
+        function ttReadModeChange(el) {
+            const bySnap = el.value === 'snapshot';
+            document.getElementById('tt-read-snap-row').style.display = bySnap ? '' : 'none';
+            document.getElementById('tt-read-ts-row').style.display = bySnap ? 'none' : '';
+        }
+        function ttRbModeChange(el) {
+            const bySnap = el.value === 'snapshot';
+            document.getElementById('tt-rb-snap-row').style.display = bySnap ? '' : 'none';
+            document.getElementById('tt-rb-ts-row').style.display = bySnap ? 'none' : '';
+        }
 
-    function showOv() { document.getElementById('ov').classList.add('on') }
-    function closeOv() { document.getElementById('ov').classList.remove('on') }
-    async function doConnect() {
-        const ep = document.getElementById('f-ep').value;
-        const ak = document.getElementById('f-ak').value;
-        const sk = document.getElementById('f-sk').value;
-        const wp = document.getElementById('f-wp').value;
-        const bk = document.getElementById('f-bk').value;
+        // ── API helpers ────────────────────────────────────────────────────────────
 
-        // S3 endpoint
-        let ep_s3 = ep
-            .replace(/localhost:8181/, "172.16.58.11:31224")
-            .replace(/:32688/, ":31224");
+        function setResult(id, html) { document.getElementById(id).innerHTML = html; }
+        function spin(id) { setResult(id, `<div class="tt-result-hdr"><span class="spinning">◌</span> loading…</div>`); }
+        function resultTable(data) {
+            if (!data.rows || !data.rows.length) return `<div style="font-size:12px;color:var(--color-text-secondary);margin-top:8px">no rows returned</div>`;
+            const cols = data.columns || Object.keys(data.rows[0]);
+            const ths = cols.map(c => `<th>${c}</th>`).join('');
+            const trs = data.rows.map(row => `<tr>${cols.map(c => {
+                const v = row[c]; return v === null ? `<td><span class="null">null</span></td>` : `<td>${esc(String(v))}</td>`;
+            }).join('')}</tr>`).join('');
+            const trunc = data.truncated ? `<div style="font-size:11px;color:var(--color-text-warning);margin-top:6px">⚠ resultado truncado a ${data.rows.length} filas</div>` : '';
+            return `<div style="overflow-x:auto"><table class="dtbl"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>${trunc}`;
+        }
+        function dtLocalToMs(id) {
+            const v = document.getElementById(id).value;
+            if (!v) return null;
+            return new Date(v).getTime();
+        }
 
+        // ── Actions ────────────────────────────────────────────────────────────────
 
-        try {
-            const res = await fetch('/connect', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ep, ep_s3, ak, sk, bk, wp })
-            });
-
-            const data = await res.json();
-            if (res.ok && data.status === "ok") {
-                document.getElementById('dot').style.background = '#1D9E75';
-                document.getElementById('clbl').textContent = 'connected';
-                closeOv();
-                loadTables(); // refresca sidebar
-            } else {
-                alert('Connection failed: ' + (data.msg || 'unknown error'));
+        async function doReadVersion() {
+            if (!sel) return;
+            spin('tt-read-result');
+            const bySnap = document.querySelector('input[name="tt-read-mode"]:checked').value === 'snapshot';
+            const limit = document.getElementById('tt-read-limit').value || 50;
+            try {
+                let url, data;
+                if (bySnap) {
+                    const snap_id = document.getElementById('tt-read-snap').value;
+                    url = `/tt/read-snapshot/${sel}?snapshot_id=${snap_id}&limit=${limit}`;
+                } else {
+                    const ts_ms = dtLocalToMs('tt-read-ts');
+                    if (!ts_ms) return setResult('tt-read-result', '<span style="color:var(--color-text-danger);font-size:12px">selecciona un datetime</span>');
+                    url = `/tt/read-timestamp/${sel}?timestamp_ms=${ts_ms}&limit=${limit}`;
+                }
+                const r = await fetch(url); data = await r.json();
+                if (data.error) throw new Error(data.error);
+                const meta = bySnap
+                    ? `snapshot <b>${data.snapshot_id}</b>`
+                    : `snapshot <b>${data.resolved_snapshot_id}</b> — resuelto para ${data.resolved_ts}`;
+                setResult('tt-read-result', `
+            <div class="tt-result-hdr">resultado · ${meta} <span class="ok">✓ ${data.total} filas</span></div>
+            ${resultTable(data)}`);
+            } catch (e) {
+                setResult('tt-read-result', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`);
             }
-        } catch (e) {
-            alert('Connection failed: ' + e.message);
         }
-    }
 
-    renderSidebar();
-</script>
+        async function doRollback() {
+            if (!sel) return;
+            spin('tt-rb-result');
+            const bySnap = document.querySelector('input[name="tt-rb-mode"]:checked').value === 'snapshot';
+            if (!confirm(`¿Seguro que quieres hacer rollback de '${sel}'? Esta acción cambiará el snapshot actual.`)) {
+                return setResult('tt-rb-result', '');
+            }
+            try {
+                let r, data;
+                if (bySnap) {
+                    const snap_id = document.getElementById('tt-rb-snap').value;
+                    r = await fetch(`/tt/rollback-snapshot/${sel}`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ snapshot_id: parseInt(snap_id) })
+                    });
+                } else {
+                    const ts_ms = dtLocalToMs('tt-rb-ts');
+                    if (!ts_ms) return setResult('tt-rb-result', '<span style="color:var(--color-text-danger);font-size:12px">selecciona un datetime</span>');
+                    r = await fetch(`/tt/rollback-timestamp/${sel}`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ timestamp_ms: ts_ms })
+                    });
+                }
+                data = await r.json();
+                if (data.error) throw new Error(data.error);
+                setResult('tt-rb-result', `
+            <div class="tt-result-hdr"><span class="ok">✓ rollback completado</span></div>
+            <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px">
+                anterior: <b style="color:var(--color-text-primary)">${data.previous_snapshot_id}</b>
+                &nbsp;→&nbsp; nuevo: <b style="color:var(--color-text-success)">${data.new_snapshot_id}</b>
+                ${data.resolved_ts ? `<br>resuelto para: ${data.resolved_ts}` : ''}
+            </div>`);
+                // refrescar datos de la tabla
+                pick(sel);
+            } catch (e) {
+                setResult('tt-rb-result', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`);
+            }
+        }
+
+        async function doChanges() {
+            if (!sel) return;
+            spin('tt-ch-result');
+            const from_id = document.getElementById('tt-ch-from').value;
+            const to_id = document.getElementById('tt-ch-to').value;
+            const limit = document.getElementById('tt-ch-limit').value || 200;
+            if (from_id === to_id) return setResult('tt-ch-result', '<span style="font-size:12px;color:var(--color-text-warning)">elige snapshots diferentes</span>');
+            try {
+                const r = await fetch(`/tt/changes/${sel}?start_snapshot_id=${from_id}&end_snapshot_id=${to_id}&limit=${limit}`);
+                const data = await r.json();
+                if (data.error) throw new Error(data.error);
+                setResult('tt-ch-result', `
+            <div class="tt-result-hdr">
+                <span>${from_id}</span> → <span>${to_id}</span>
+                <span class="ok">✓ ${data.added_records} registros añadidos</span>
+            </div>
+            ${resultTable(data)}`);
+            } catch (e) {
+                setResult('tt-ch-result', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`);
+            }
+        }
+
+        async function doExpire() {
+            if (!sel) return;
+            const ts_ms = dtLocalToMs('tt-exp-ts');
+            if (!ts_ms) return setResult('tt-exp-result', '<span style="font-size:12px;color:var(--color-text-danger)">selecciona una fecha</span>');
+            const retain = parseInt(document.getElementById('tt-exp-retain').value) || 1;
+            if (!confirm(`¿Expirar snapshots de '${sel}' anteriores a la fecha seleccionada? Se conservarán al menos ${retain}.`)) return;
+            spin('tt-exp-result');
+            try {
+                const r = await fetch(`/tt/expire/${sel}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ older_than_ms: ts_ms, retain_last: retain })
+                });
+                const data = await r.json();
+                if (data.error) throw new Error(data.error);
+                setResult('tt-exp-result', `
+            <div class="tt-result-hdr"><span class="ok">✓ expiración completada</span></div>
+            <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px">
+                eliminados: <b style="color:var(--color-text-danger)">${data.deleted_snapshots}</b>
+                &nbsp;·&nbsp; restantes: <b style="color:var(--color-text-success)">${data.remaining_snapshots}</b>
+            </div>`);
+                pick(sel);
+            } catch (e) {
+                setResult('tt-exp-result', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`);
+            }
+        }
+
+        async function doOrphans() {
+            if (!sel) return;
+            if (!confirm(`¿Eliminar archivos huérfanos de '${sel}'?`)) return;
+            spin('tt-orp-result');
+            try {
+                const r = await fetch(`/tt/orphans/${sel}`, { method: 'POST' });
+                const data = await r.json();
+                if (data.error) throw new Error(data.error);
+                setResult('tt-orp-result', `
+            <div class="tt-result-hdr" style="margin-top:8px"><span class="ok">✓ ${data.deleted_count} archivos eliminados</span></div>
+            ${data.deleted_files.length ? `<div style="font-size:11px;color:var(--color-text-secondary);margin-top:4px">${data.deleted_files.map(f => `<div>${f}</div>`).join('')}</div>` : ''}`);
+            } catch (e) {
+                setResult('tt-orp-result', `<div class="tt-result-hdr" style="margin-top:8px"><span class="err">✗ ${e.message}</span></div>`);
+            }
+        }
+
+        async function loadStats() {
+            if (!sel) return;
+            document.getElementById('tt-stats-area').innerHTML = `<div class="tt-result-hdr"><span class="spinning">◌</span> loading stats…</div>`;
+            try {
+                const r = await fetch(`/tt/stats/${sel}`);
+                const d = await r.json();
+                if (d.error) throw new Error(d.error);
+                const opsHtml = Object.entries(d.operations || {}).map(([op, n]) =>
+                    `<span class="ops-pill"><b style="color:var(--color-text-primary)">${n}</b> ${op}</span>`
+                ).join('');
+                document.getElementById('tt-stats-area').innerHTML = `
+            <div class="stat-grid">
+                <div class="stat-card"><div class="stat-label">total snapshots</div><div class="stat-val">${d.total_snapshots}</div></div>
+                <div class="stat-card"><div class="stat-label">span (hours)</div><div class="stat-val">${d.span_hours}</div></div>
+                <div class="stat-card"><div class="stat-label">total size</div><div class="stat-val">${d.total_size_mb} MB</div></div>
+            </div>
+            <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">operations</div>
+            <div style="margin-bottom:10px">${opsHtml || '—'}</div>
+            <div style="font-size:11px;color:var(--color-text-secondary)">
+                oldest: <b style="color:var(--color-text-primary)">${d.oldest_ts}</b>
+                &nbsp;·&nbsp; newest: <b style="color:var(--color-text-primary)">${d.newest_ts}</b>
+            </div>`;
+            } catch (e) {
+                document.getElementById('tt-stats-area').innerHTML = `<span style="font-size:12px;color:var(--color-text-danger)">✗ ${e.message}</span>`;
+            }
+        }
+
+        // ── Connect ────────────────────────────────────────────────────────────────
+
+        function showOv() { document.getElementById('ov').classList.add('on'); }
+        function closeOv() { document.getElementById('ov').classList.remove('on'); }
+
+        async function doConnect() {
+            const ep = document.getElementById('f-ep').value;
+            const ak = document.getElementById('f-ak').value;
+            const sk = document.getElementById('f-sk').value;
+            const bk = document.getElementById('f-bk').value;
+            const wp = document.getElementById('f-wp').value;
+            const ep_s3 = ep.replace(/localhost:8181/, '172.16.58.11:31224').replace(/:32688/, ':31224');
+            try {
+                const r = await fetch('/connect', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ep, ep_s3, ak, sk, bk, wp })
+                });
+                const data = await r.json();
+                if (r.ok && data.status === 'ok') {
+                    document.getElementById('dot').style.background = '#1D9E75';
+                    document.getElementById('clbl').textContent = 'connected';
+                    closeOv(); loadTables();
+                } else { alert('Connection failed: ' + (data.msg || 'unknown error')); }
+            } catch (e) { alert('Connection failed: ' + e.message); }
+        }
+
+        renderSidebar();
+    </script>
+</body>
+
+</html>
