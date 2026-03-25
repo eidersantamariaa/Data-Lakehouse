@@ -101,7 +101,10 @@ def initial_load(table_name, base_df):
 
 
 def build_updates_df(base_df, key_col, update_col, update_ratio):
-    updates = base_df.where(F.rand(seed=42) < update_ratio)
+    # Spark row-level MERGE requires deterministic source expressions.
+    # Use hash-based deterministic sampling instead of rand().
+    threshold = int(max(0.0, min(1.0, float(update_ratio))) * 100)
+    updates = base_df.where(F.pmod(F.abs(F.hash(F.col(key_col))), F.lit(100)) < F.lit(threshold))
 
     dt = next(f.dataType for f in base_df.schema.fields if f.name == update_col)
 
@@ -117,7 +120,8 @@ def build_updates_df(base_df, key_col, update_col, update_ratio):
             "Usa --update-col con una columna string/numerica/timestamp/date."
         )
 
-    return updates.select(key_col, update_col)
+    # MERGE source should contain unique keys to avoid ambiguous matches.
+    return updates.select(key_col, update_col).dropDuplicates([key_col])
 
 
 def merge_updates(spark, table_name, key_col, update_col, updates_df):
