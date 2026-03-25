@@ -21,7 +21,7 @@ bucket=warehouse
 
 @app.post("/connect")
 async def connect_catalog(req: Request):
-    global catalog, s3_config
+    global catalog, s3_config, tt
     data = await req.json()
     try:
         catalog = load_catalog(
@@ -39,14 +39,28 @@ async def connect_catalog(req: Request):
         )
         # Guarda los datos de conexión para usarlos en preview
         s3_config = data
-        tt = TimeTraveler(catalog)
-
         namespaces = catalog.list_namespaces()
         print("✅ namespaces:", namespaces)
-        return JSONResponse({"status": "ok"})
     except Exception as e:
         print("❌ error:", e)
         return JSONResponse({"status": "error", "msg": str(e)}, status_code=400)
+    
+    try:
+        tt = TimeTraveler(catalog)
+        print("✅ tt ok:", tt)
+    except Exception as e:
+        print("❌ tt error:", e)
+        return JSONResponse({"status": "error", "msg": f"TimeTraveler init failed: {e}"}, status_code=400)
+
+    return JSONResponse({"status": "ok"})
+
+@app.get("/status")
+def status():
+    return {
+        "catalog": catalog is not None,
+        "tt": tt is not None,
+        "catalog_type": str(type(catalog)) if catalog else None,
+    }
 
 @app.get("/tables")
 def list_tables():
@@ -160,10 +174,10 @@ def _tt():
     return tt
 
 @app.get("/tt/read-snapshot/{table}")
-def tt_read_snapshot(table: str, snapshot_id: int, limit: int = 50):
+def tt_read_snapshot(table: str, snapshot_id: str, limit: int = 50):
     """Lee datos de la tabla en un snapshot concreto."""
     try:
-        return _tt().read_at_snapshot(table, snapshot_id, limit)
+        return _tt().read_at_snapshot(table, int(snapshot_id), limit)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=400)
  
@@ -198,10 +212,10 @@ async def tt_rollback_timestamp(table: str, req: Request):
  
  
 @app.get("/tt/changes/{table}")
-def tt_changes(table: str, start_snapshot_id: int, end_snapshot_id: int, limit: int = 200):
+def tt_changes(table: str, start_snapshot_id: str, end_snapshot_id: str, limit: int = 200):
     """Devuelve registros anadidos entre dos snapshots."""
     try:
-        return _tt().get_incremental_changes(table, start_snapshot_id, end_snapshot_id, limit)
+        return _tt().get_incremental_changes(table, int(start_snapshot_id), int(end_snapshot_id), limit)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=400)
  
@@ -237,7 +251,7 @@ def tt_stats(table: str):
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=400)
     
-    
+
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
