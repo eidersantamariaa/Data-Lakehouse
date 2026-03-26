@@ -95,7 +95,7 @@ def schema(table: str):
             {"id": f.field_id, "n": f.name, "t": str(f.field_type).lower(), "req": f.required}
             for f in t.schema().fields
         ],
-        "rows": int(summary.get("total-records", 0)),
+        "rows": int(t.scan().to_arrow().num_rows),
         "files": int(summary.get("total-data-files", 0)),
         "size": size_str,
         "part": str(t.spec()) or "unpartitioned",
