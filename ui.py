@@ -14,6 +14,8 @@ s3_config = {}
 tt: TimeTraveler | None = None
 
 """
+pip install pyarrow pyiceberg boto3 fastapi uvicorn
+
 endpoint=http://172.16.58.11:32688
 access_key=GK5f421d5f440758f74b0e0312
 secret_key=409baa63477885db12cd1db0a518748c5e83e971b5e8cf2129fe6c7498de125d

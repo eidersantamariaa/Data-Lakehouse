@@ -12,7 +12,7 @@ uvicorn API_simu:app --reload --port 8001
 # ---------------------------------------------------------------------------
 
 LEAGUES = [
-    {"id": 1, "name": "La Liga", "country": "Spain", "year": "1929"},
+    {"id": 1, "name": "The Liga", "country": "Spain"},
     {"id": 2, "name": "Premier League", "country": "England", "year": "1992"},
     {"id": 3, "name": "Bundesliga", "country": "Germany", "year": "1963"},
 ]
