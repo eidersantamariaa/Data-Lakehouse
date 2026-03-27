@@ -69,44 +69,71 @@ def run_ingesta(config):
     spark = get_spark()
     spark.sql(f"CREATE NAMESPACE IF NOT EXISTS players.{config.NAMESPACE}")
 
-    data = config.get_data()  # {"leagues": [...], "teams": [...], "players": [...]}
+    data = config.get_data()
 
     for table_name, records in data.items():
-        print(f"Writing {table_name} to Bronze... ({len(records)} records)")
-        df = spark.read.json(spark.sparkContext.parallelize(
-            [json.dumps(r) for r in records]
-        ))
+        print(f"Processing {table_name}... ({len(records)} records)")
+        full_table = f"players.{config.NAMESPACE}.{table_name}_bronce"
         
-        # Deduplicate: remove exact duplicates (same values in all columns)
-        df_dedup = df.dropDuplicates()
-        dedup_count = df.count() - df_dedup.count()
-        if dedup_count > 0:
-            print(f"  ⚠ Removed {dedup_count} duplicate record(s) from this batch")
-        
+        df_new = spark.read.json(
+            spark.sparkContext.parallelize([json.dumps(r) for r in records])
+        )
+
+        # ¿Existe la tabla?
         try:
-            df_dedup.writeTo(f"players.{config.NAMESPACE}.{table_name}_bronce").append()
-            accion = "INSERT"
-        except AnalysisException as e:
-            if "TABLE_OR_VIEW_NOT_FOUND" in str(e) or "Table not found" in str(e):
-                df_dedup.writeTo(f"players.{config.NAMESPACE}.{table_name}_bronce") \
-                    .tableProperty("format-version", "2") \
-                    .create()
-                accion = "CREATE"
-            else:
-                raise  # error real → lo propagamos, no lo silenciamos
-            
-        write_audit_log(spark, config.NAMESPACE, f"{table_name}_bronce", accion, df_dedup.count())
+            spark.sql(f"SELECT 1 FROM {full_table} LIMIT 1")
+            table_exists = True
+        except Exception:
+            table_exists = False
 
-        print(f"✅ {table_name} written successfully ({df_dedup.count()} records)")
+        if not table_exists:
+            # Primera vez: crear directamente
+            df_new.writeTo(full_table) \
+                .tableProperty("format-version", "2") \
+                .create()
+            accion = "CREATE"
 
-         # Compacta ficheros pequeños
-        full = f"players.{config.NAMESPACE}.{table_name}_bronce"
-        print(f"🔧 Compactando {full}...")
+        else:
+            # Evolución de esquema: añadir columnas nuevas si las hay
+            existing_cols = set(spark.table(full_table).columns)
+            new_cols = set(df_new.columns) - existing_cols
+
+            for col in new_cols:
+                col_type = dict(df_new.dtypes)[col]
+                print(f"  ➕ Nueva columna detectada: {col} ({col_type})")
+                spark.sql(f"ALTER TABLE {full_table} ADD COLUMN {col} {col_type}")
+
+            # Upsert: MERGE INTO usando 'id' como clave
+            df_new.createOrReplaceTempView(f"incoming_{table_name}")
+
+            update_set = ", ".join(
+                [f"target.{c} = source.{c}" for c in df_new.columns if c != "id"]
+            )
+            insert_cols = ", ".join(df_new.columns)
+            insert_vals = ", ".join([f"source.{c}" for c in df_new.columns])
+
+            spark.sql(f"""
+                MERGE INTO {full_table} AS target
+                USING incoming_{table_name} AS source
+                ON target.id = source.id
+                WHEN MATCHED AND (
+                    {" OR ".join([f"target.{c} <> source.{c} OR (target.{c} IS NULL AND source.{c} IS NOT NULL)"
+                                  for c in df_new.columns if c != "id"])}
+                ) THEN UPDATE SET {update_set}
+                WHEN NOT MATCHED THEN INSERT ({insert_cols}) VALUES ({insert_vals})
+            """)
+            accion = "MERGE"
+
+        write_audit_log(spark, config.NAMESPACE, f"{table_name}_bronce", accion, len(records))
+        print(f"✅ {table_name} procesado ({accion})")
+
+        # Compactar
+        print(f"🔧 Compactando {full_table}...")
         spark.sql(f"""
             CALL players.system.rewrite_data_files(
-                table => '{full}',
+                table => '{full_table}',
                 strategy => 'binpack',
                 options => map('target-file-size-bytes', '134217728')
             )
         """)
-        print(f"✅ {full} compactado")
+        print(f"✅ {full_table} compactado")
