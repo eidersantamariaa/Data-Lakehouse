@@ -4,7 +4,7 @@ app = FastAPI(title="Mock Sports API")
 
 """
 pip install fastapi uvicorn
-uvicorn api:app --reload --port 8001
+uvicorn API_simu:app --reload --port 8001
 """
 
 # ---------------------------------------------------------------------------
