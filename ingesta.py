@@ -90,6 +90,9 @@ def run_ingesta(config):
             # Primera vez: crear directamente
             df_new.writeTo(full_table) \
                 .tableProperty("format-version", "2") \
+                .tableProperty("write.delete.mode", "merge-on-read") \
+                .tableProperty("write.update.mode", "merge-on-read") \
+                .tableProperty("write.merge.mode", "merge-on-read") \
                 .create()
             accion = "CREATE"
 
@@ -102,6 +105,7 @@ def run_ingesta(config):
                 col_type = dict(df_new.dtypes)[col]
                 print(f"  ➕ Nueva columna detectada: {col} ({col_type})")
                 spark.sql(f"ALTER TABLE {full_table} ADD COLUMN {col} {col_type}")
+                accion = "ALTER"
 
             # Upsert: MERGE INTO usando 'id' como clave
             df_new.createOrReplaceTempView(f"incoming_{table_name}")

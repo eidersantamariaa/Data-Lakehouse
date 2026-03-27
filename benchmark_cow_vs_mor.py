@@ -20,6 +20,7 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import DateType, NumericType, StringType, TimestampType
 
 from ingesta import get_spark
+from audit_log import write_audit_log
 
 
 def timed(label, fn):
@@ -103,6 +104,10 @@ def initial_load(table_name, base_df):
 def count_update_rows(base_df, key_col, update_ratio):
     threshold = int(max(0.0, min(1.0, float(update_ratio))) * 100)
     return base_df.where(F.pmod(F.abs(F.hash(F.col(key_col))), F.lit(100)) < F.lit(threshold)).count()
+
+
+def count_delete_rows(base_df, key_col):
+    return base_df.where(F.pmod(F.abs(F.hash(F.col(key_col))), F.lit(10)) == F.lit(0)).count()
 
 
 def update_slice(spark, table_name, key_col, update_col, update_ratio, update_type):
@@ -204,6 +209,7 @@ def run(cli_args=None):
     )
 
     updates_rows = count_update_rows(base_df, args.key_col, args.update_ratio)
+    deletes_rows = count_delete_rows(base_df, args.key_col)
 
     print("=== Config ===")
     print(f"source_table: {source_table}")
@@ -212,13 +218,22 @@ def run(cli_args=None):
     print(f"update_type: {update_type}")
     print(f"sample_rows: {base_rows}")
     print(f"updates_rows: {updates_rows}")
+    print(f"deletes_rows: {deletes_rows}")
 
     results = []
     for table_name in [cow_table, mor_table]:
         results.append(initial_load(table_name, base_df))
+        write_audit_log(spark, args.namespace, table_name, "BENCH_INITIAL_LOAD", base_rows)
+
         results.append(update_slice(spark, table_name, args.key_col, update_col, args.update_ratio, update_type))
+        write_audit_log(spark, args.namespace, table_name, "BENCH_UPDATE", updates_rows)
+
         results.append(delete_slice(spark, table_name, args.key_col))
+        write_audit_log(spark, args.namespace, table_name, "BENCH_DELETE", deletes_rows)
+
         results.append(read_full(spark, table_name))
+        current_rows = spark.read.table(table_name).count()
+        write_audit_log(spark, args.namespace, table_name, "BENCH_READ", current_rows)
 
     print("\n=== Benchmark Results (seconds) ===")
     for label, secs in results:
@@ -249,7 +264,10 @@ def run(cli_args=None):
 
     if not args.keep_tables:
         spark.sql(f"DROP TABLE IF EXISTS {cow_table}")
+        write_audit_log(spark, args.namespace, cow_table, "BENCH_DROP", 0)
+
         spark.sql(f"DROP TABLE IF EXISTS {mor_table}")
+        write_audit_log(spark, args.namespace, mor_table, "BENCH_DROP", 0)
 
     spark.stop()
 

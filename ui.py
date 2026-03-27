@@ -234,6 +234,7 @@ def delete_table(table: str):
 
     # Command string shown in server logs and returned to UI
     cmd = f"DROP TABLE players.{ns}.{tbl_name} PURGE"
+    count = f"SELECT COUNT(*) FROM players.{ns}.{tbl_name}"
     print(f"🗑 executing server command: {cmd}")
 
     try:
@@ -250,7 +251,7 @@ def delete_table(table: str):
             namespace=ns,
             table_name=tbl_name,
             accion= "DROP",
-            num_registros=0,
+            num_registros=count,
         )
 
         return {
