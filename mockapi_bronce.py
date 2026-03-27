@@ -10,7 +10,7 @@ import pyspark
 from pyspark.sql import SparkSession
 from ingesta import get_spark
 
-base_url = "http://127.0.0.1"
+base_url = "http://127.0.0.1:8001"
 session = requests.Session()
 
 NAMESPACE = "mockapi"  
@@ -69,5 +69,3 @@ def getPlayers():
 
     print("Players retrieved successfully")
     return players
-
-get_data()
