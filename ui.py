@@ -309,40 +309,6 @@ def tt_changes(table: str, start_snapshot_id: str, end_snapshot_id: str, limit: 
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=400)
  
- 
-@app.post("/tt/expire/{table}")
-async def tt_expire(table: str, req: Request):
-    """Expira snapshots anteriores a la fecha indicada."""
-    try:
-        body = await req.json()
-        return _tt().expire_snapshots(
-            table,
-            int(body["older_than_ms"]),
-            int(body.get("retain_last", 1)),
-        )
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=400)
- 
- 
-@app.post("/tt/orphans/{table}")
-async def tt_orphans(table: str):
-    """Elimina archivos huerfanos de la tabla."""
-    try:
-        return _tt().remove_orphan_files(table)
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=400)
- 
- 
-@app.get("/tt/stats/{table}")
-def tt_stats(table: str):
-    """Estadisticas del historial de snapshots."""
-    try:
-        return _tt().snapshot_stats(table)
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=400)
-    
-
-
 @app.get("/", response_class=HTMLResponse)
 async def root():
     with open("ui.html") as f:

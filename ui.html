@@ -537,44 +537,6 @@
             margin-left: auto;
         }
 
-        .stat-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            margin-bottom: 12px;
-        }
-
-        .stat-card {
-            background: var(--color-background-secondary);
-            border-radius: var(--border-radius-md);
-            padding: 10px 12px;
-        }
-
-        .stat-label {
-            font-size: 10px;
-            color: var(--color-text-secondary);
-            text-transform: uppercase;
-            letter-spacing: .06em;
-            margin-bottom: 4px;
-        }
-
-        .stat-val {
-            font-size: 16px;
-            font-weight: 600;
-            color: var(--color-text-primary);
-        }
-
-        .ops-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 11px;
-            background: var(--color-background-secondary);
-            margin-right: 4px;
-        }
-
         .spinning {
             display: inline-block;
             animation: spin .7s linear infinite;
@@ -791,124 +753,87 @@
         function renderTimeTravel(d) {
             const snapOpts = d.snaps.map(s => `<option value="${s.id}">[${s.ts}] ${s.id} ${s.current ? '← current' : ''}</option>`).join('');
             return `
-<div class="tt-modes">
-    <button class="tt-mode-btn on" onclick="ttMode('read',this)">read version</button>
-    <button class="tt-mode-btn" onclick="ttMode('rollback',this)">rollback</button>
-    <button class="tt-mode-btn" onclick="ttMode('changes',this)">incremental changes</button>
-    <button class="tt-mode-btn" onclick="ttMode('maintenance',this)">maintenance</button>
-</div>
+            <div class="tt-modes">
+                <button class="tt-mode-btn on" onclick="ttMode('read',this)">read version</button>
+                <button class="tt-mode-btn" onclick="ttMode('rollback',this)">rollback</button>
+                <button class="tt-mode-btn" onclick="ttMode('changes',this)">incremental changes</button>
+            </div>
 
-<!-- ── PANEL: read version ── -->
-<div class="tt-panel on" id="tt-read">
-    <div class="tt-row">
-        <span class="tt-label">by</span>
-        <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer">
-            <input type="radio" name="tt-read-mode" value="snapshot" checked onchange="ttReadModeChange(this)"> snapshot id
-        </label>
-        <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer">
-            <input type="radio" name="tt-read-mode" value="timestamp" onchange="ttReadModeChange(this)"> timestamp
-        </label>
-    </div>
-    <div class="tt-row" id="tt-read-snap-row">
-        <span class="tt-label">snapshot</span>
-        <select id="tt-read-snap" style="flex:1;max-width:360px">${snapOpts}</select>
-    </div>
-    <div class="tt-row" id="tt-read-ts-row" style="display:none">
-        <span class="tt-label">datetime</span>
-        <input type="datetime-local" id="tt-read-ts" style="flex:1;max-width:280px">
-    </div>
-    <div class="tt-row">
-        <span class="tt-label">limit</span>
-        <input type="number" id="tt-read-limit" value="50" style="width:70px">
-        <button class="tt-btn-info" onclick="doReadVersion()">load preview</button>
-    </div>
-    <div class="tt-result" id="tt-read-result"></div>
-</div>
+            <!-- ── PANEL: read version ── -->
+            <div class="tt-panel on" id="tt-read">
+                <div class="tt-row">
+                    <span class="tt-label">by</span>
+                    <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer">
+                        <input type="radio" name="tt-read-mode" value="snapshot" checked onchange="ttReadModeChange(this)"> snapshot id
+                    </label>
+                    <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer">
+                        <input type="radio" name="tt-read-mode" value="timestamp" onchange="ttReadModeChange(this)"> timestamp
+                    </label>
+                </div>
+                <div class="tt-row" id="tt-read-snap-row">
+                    <span class="tt-label">snapshot</span>
+                    <select id="tt-read-snap" style="flex:1;max-width:360px">${snapOpts}</select>
+                </div>
+                <div class="tt-row" id="tt-read-ts-row" style="display:none">
+                    <span class="tt-label">datetime</span>
+                    <input type="datetime-local" id="tt-read-ts" style="flex:1;max-width:280px">
+                </div>
+                <div class="tt-row">
+                    <span class="tt-label">limit</span>
+                    <input type="number" id="tt-read-limit" value="50" style="width:70px">
+                    <button class="tt-btn-info" onclick="doReadVersion()">load preview</button>
+                </div>
+                <div class="tt-result" id="tt-read-result"></div>
+            </div>
 
-<!-- ── PANEL: rollback ── -->
-<div class="tt-panel" id="tt-rollback">
-    <div class="warn-box">
-        ⚠ rollback cambia el snapshot actual de la tabla. esta operacion no se puede deshacer desde la UI.
-    </div>
-    <div class="tt-row">
-        <span class="tt-label">by</span>
-        <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer">
-            <input type="radio" name="tt-rb-mode" value="snapshot" checked onchange="ttRbModeChange(this)"> snapshot id
-        </label>
-        <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer">
-            <input type="radio" name="tt-rb-mode" value="timestamp" onchange="ttRbModeChange(this)"> timestamp
-        </label>
-    </div>
-    <div id="tt-rb-snap-row" class="tt-row">
-        <span class="tt-label">target</span>
-        <select id="tt-rb-snap" style="flex:1;max-width:360px">${snapOpts}</select>
-    </div>
-    <div id="tt-rb-ts-row" class="tt-row" style="display:none">
-        <span class="tt-label">datetime</span>
-        <input type="datetime-local" id="tt-rb-ts" style="flex:1;max-width:280px">
-    </div>
-    <div class="tt-row">
-        <button class="tt-btn-danger" onclick="doRollback()">rollback table</button>
-    </div>
-    <div class="tt-result" id="tt-rb-result"></div>
-</div>
+            <!-- ── PANEL: rollback ── -->
+            <div class="tt-panel" id="tt-rollback">
+                <div class="warn-box">
+                    ⚠ rollback cambia el snapshot actual de la tabla. esta operacion no se puede deshacer desde la UI.
+                </div>
+                <div class="tt-row">
+                    <span class="tt-label">by</span>
+                    <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer">
+                        <input type="radio" name="tt-rb-mode" value="snapshot" checked onchange="ttRbModeChange(this)"> snapshot id
+                    </label>
+                    <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer">
+                        <input type="radio" name="tt-rb-mode" value="timestamp" onchange="ttRbModeChange(this)"> timestamp
+                    </label>
+                </div>
+                <div id="tt-rb-snap-row" class="tt-row">
+                    <span class="tt-label">target</span>
+                    <select id="tt-rb-snap" style="flex:1;max-width:360px">${snapOpts}</select>
+                </div>
+                <div id="tt-rb-ts-row" class="tt-row" style="display:none">
+                    <span class="tt-label">datetime</span>
+                    <input type="datetime-local" id="tt-rb-ts" style="flex:1;max-width:280px">
+                </div>
+                <div class="tt-row">
+                    <button class="tt-btn-danger" onclick="doRollback()">rollback table</button>
+                </div>
+                <div class="tt-result" id="tt-rb-result"></div>
+            </div>
 
-<!-- ── PANEL: incremental changes ── -->
-<div class="tt-panel" id="tt-changes">
-    <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:12px">
-        muestra los registros añadidos entre dos snapshots (append scan incremental).
-    </div>
-    <div class="tt-row">
-        <span class="tt-label">from snap</span>
-        <select id="tt-ch-from" style="flex:1;max-width:320px">${snapOpts}</select>
-    </div>
-    <div class="tt-row">
-        <span class="tt-label">to snap</span>
-        <select id="tt-ch-to" style="flex:1;max-width:320px">${snapOpts}</select>
-    </div>
-    <div class="tt-row">
-        <span class="tt-label">limit</span>
-        <input type="number" id="tt-ch-limit" value="200" style="width:70px">
-        <button class="tt-btn-info" onclick="doChanges()">compute changes</button>
-    </div>
-    <div class="tt-result" id="tt-ch-result"></div>
-</div>
-
-<!-- ── PANEL: maintenance ── -->
-<div class="tt-panel" id="tt-maintenance">
-    <!-- Stats card -->
-    <div id="tt-stats-area" style="margin-bottom:14px">
-        <button onclick="loadStats()" style="font-size:11px">load snapshot stats</button>
-    </div>
-
-    <!-- Expire -->
-    <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:12px;margin-bottom:10px">
-        <div style="font-size:11px;font-weight:500;margin-bottom:8px;color:var(--color-text-primary)">expire snapshots</div>
-        <div class="warn-box" style="margin-bottom:8px">
-            ⚠ los snapshots expirados no podran usarse para time travel.
-        </div>
-        <div class="tt-row">
-            <span class="tt-label">older than</span>
-            <input type="datetime-local" id="tt-exp-ts" style="flex:1;max-width:240px">
-        </div>
-        <div class="tt-row">
-            <span class="tt-label">retain last</span>
-            <input type="number" id="tt-exp-retain" value="3" min="1" style="width:60px">
-            <button class="tt-btn-danger" onclick="doExpire()">expire snapshots</button>
-        </div>
-        <div class="tt-result" id="tt-exp-result"></div>
-    </div>
-
-    <!-- Orphan files -->
-    <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:12px">
-        <div style="font-size:11px;font-weight:500;margin-bottom:6px;color:var(--color-text-primary)">remove orphan files</div>
-        <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:8px">
-            elimina archivos de datos no referenciados por ningun snapshot.
-        </div>
-        <button class="tt-btn-danger" onclick="doOrphans()">remove orphan files</button>
-        <div class="tt-result" id="tt-orp-result"></div>
-    </div>
-</div>`;
+            <!-- ── PANEL: incremental changes ── -->
+            <div class="tt-panel" id="tt-changes">
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:12px">
+                    muestra los registros añadidos entre dos snapshots (append scan incremental).
+                </div>
+                <div class="tt-row">
+                    <span class="tt-label">from snap</span>
+                    <select id="tt-ch-from" style="flex:1;max-width:320px">${snapOpts}</select>
+                </div>
+                <div class="tt-row">
+                    <span class="tt-label">to snap</span>
+                    <select id="tt-ch-to" style="flex:1;max-width:320px">${snapOpts}</select>
+                </div>
+                <div class="tt-row">
+                    <span class="tt-label">limit</span>
+                    <input type="number" id="tt-ch-limit" value="200" style="width:70px">
+                    <button class="tt-btn-info" onclick="doChanges()">compute changes</button>
+                </div>
+                <div class="tt-result" id="tt-ch-result"></div>
+            </div>`;
         }
 
         // ── Time Travel mode toggle ────────────────────────────────────────────────
@@ -938,7 +863,6 @@
         function resultTable(data) {
             if (!data.rows || !data.rows.length) return `<div style="font-size:12px;color:var(--color-text-secondary);margin-top:8px">no rows returned</div>`;
             const cols = data.columns || Object.keys(data.rows[0]);
-            // Filter out __change_type from display columns
             const displayCols = cols.filter(c => !c.startsWith('__'));
             const ths = displayCols.map(c => `<th>${c}</th>`).join('');
             const trs = data.rows.map(row => {
@@ -1048,7 +972,6 @@
                 &nbsp;→&nbsp; nuevo: <b style="color:var(--color-text-success)">${data.new_snapshot_id}</b>
                 ${data.resolved_ts ? `<br>resuelto para: ${data.resolved_ts}` : ''}
             </div>`);
-                // refrescar datos de la tabla
                 pick(sel);
             } catch (e) {
                 setResult('tt-rb-result', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`);
@@ -1077,75 +1000,6 @@
             ${resultTable(data)}`);
             } catch (e) {
                 setResult('tt-ch-result', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`);
-            }
-        }
-
-        async function doExpire() {
-            if (!sel) return;
-            const ts_ms = dtLocalToMs('tt-exp-ts');
-            if (!ts_ms) return setResult('tt-exp-result', '<span style="font-size:12px;color:var(--color-text-danger)">selecciona una fecha</span>');
-            const retain = parseInt(document.getElementById('tt-exp-retain').value) || 1;
-            if (!confirm(`¿Expirar snapshots de '${sel}' anteriores a la fecha seleccionada? Se conservarán al menos ${retain}.`)) return;
-            spin('tt-exp-result');
-            try {
-                const r = await fetch(`/tt/expire/${sel}`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ older_than_ms: ts_ms, retain_last: retain })
-                });
-                const data = await r.json();
-                if (data.error) throw new Error(data.error);
-                setResult('tt-exp-result', `
-            <div class="tt-result-hdr"><span class="ok">✓ expiración completada</span></div>
-            <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px">
-                eliminados: <b style="color:var(--color-text-danger)">${data.deleted_snapshots}</b>
-                &nbsp;·&nbsp; restantes: <b style="color:var(--color-text-success)">${data.remaining_snapshots}</b>
-            </div>`);
-                pick(sel);
-            } catch (e) {
-                setResult('tt-exp-result', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`);
-            }
-        }
-
-        async function doOrphans() {
-            if (!sel) return;
-            if (!confirm(`¿Eliminar archivos huérfanos de '${sel}'?`)) return;
-            spin('tt-orp-result');
-            try {
-                const r = await fetch(`/tt/orphans/${sel}`, { method: 'POST' });
-                const data = await r.json();
-                if (data.error) throw new Error(data.error);
-                setResult('tt-orp-result', `
-            <div class="tt-result-hdr" style="margin-top:8px"><span class="ok">✓ ${data.deleted_count} archivos eliminados</span></div>
-            ${data.deleted_files.length ? `<div style="font-size:11px;color:var(--color-text-secondary);margin-top:4px">${data.deleted_files.map(f => `<div>${f}</div>`).join('')}</div>` : ''}`);
-            } catch (e) {
-                setResult('tt-orp-result', `<div class="tt-result-hdr" style="margin-top:8px"><span class="err">✗ ${e.message}</span></div>`);
-            }
-        }
-
-        async function loadStats() {
-            if (!sel) return;
-            document.getElementById('tt-stats-area').innerHTML = `<div class="tt-result-hdr"><span class="spinning">◌</span> loading stats…</div>`;
-            try {
-                const r = await fetch(`/tt/stats/${sel}`);
-                const d = await r.json();
-                if (d.error) throw new Error(d.error);
-                const opsHtml = Object.entries(d.operations || {}).map(([op, n]) =>
-                    `<span class="ops-pill"><b style="color:var(--color-text-primary)">${n}</b> ${op}</span>`
-                ).join('');
-                document.getElementById('tt-stats-area').innerHTML = `
-            <div class="stat-grid">
-                <div class="stat-card"><div class="stat-label">total snapshots</div><div class="stat-val">${d.total_snapshots}</div></div>
-                <div class="stat-card"><div class="stat-label">span (hours)</div><div class="stat-val">${d.span_hours}</div></div>
-                <div class="stat-card"><div class="stat-label">total size</div><div class="stat-val">${d.total_size_mb} MB</div></div>
-            </div>
-            <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">operations</div>
-            <div style="margin-bottom:10px">${opsHtml || '—'}</div>
-            <div style="font-size:11px;color:var(--color-text-secondary)">
-                oldest: <b style="color:var(--color-text-primary)">${d.oldest_ts}</b>
-                &nbsp;·&nbsp; newest: <b style="color:var(--color-text-primary)">${d.newest_ts}</b>
-            </div>`;
-            } catch (e) {
-                document.getElementById('tt-stats-area').innerHTML = `<span style="font-size:12px;color:var(--color-text-danger)">✗ ${e.message}</span>`;
             }
         }
 
