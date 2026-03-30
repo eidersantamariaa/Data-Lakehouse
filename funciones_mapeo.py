@@ -31,6 +31,8 @@ def extraer_inicial_apellido(nombre_raw: str) -> tuple[str, str]:
 
     # Formato "Nombre Apellido1 [Apellido2]"
     partes = nombre_raw.split()
+    if len(partes) == 1:
+        return partes[0][0].upper(), partes[0].capitalize()
     inicial = partes[0][0].upper()
 
     if len(partes) == 2:
