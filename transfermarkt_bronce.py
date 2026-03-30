@@ -44,6 +44,7 @@ def getBig5():
     def fetch_league(name, country):
         safe_name = quote(name)
         url = f"{base_url}/competitions/search/{safe_name}"
+        print(url)
         res = session.get(url)
         if res.status_code != 200:
             print(f"Error {res.status_code} fetching {name}")
