@@ -31,19 +31,26 @@ print(df_mapeo)
 """
 
 def run(df1, df2):
-    # 1. Generar clave única en ambos DataFrames
-    df1['clave'] = df1.apply(lambda r: generar_clave(r['name'], r['dateOfBirth']), axis=1)
+    # 1. Generar clave única usando los campos reales de df1 (transfermarkt)
+    df1['clave'] = df1.apply(
+        lambda r: generar_clave(r['name'], r['dateOfBirth']), axis=1
+    )
 
-    # 2. Crear tabla de mapeo usando la clave
+    # 2. Mapeo directo usando idTransferMkt que ya existe en df2
     mapeo = (
-        df1[['idTransferMkt', 'clave']]
+        df2[['idPlayer', 'idTransferMkt']]
         .merge(
-            df2[['id_api2', 'clave']],
-            on='clave',
+            df1[['id', 'clave']],
+            left_on='idTransferMkt',
+            right_on='id',
             how='left'
         )
-        .drop(columns='clave')
+        .drop(columns='id')
+        .rename(columns={
+            'clave':          'id_propio',
+            'idTransferMkt':  'id_transfermarkt',
+            'idPlayer':       'id_thesportsdb'
+        })
     )
 
     return mapeo
-
