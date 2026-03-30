@@ -1,7 +1,7 @@
 import pandas as pd
 from funciones_mapeo import generar_clave
 from ingesta import get_spark
-
+"""
 # 1. Cargar los DataFrames (de tus APIs)
 df_api1 = ...
 df_api2 = ...
@@ -28,6 +28,7 @@ df_mapeo = (
 )
 
 print(df_mapeo)
+"""
 
 def run(df1, df2):
     # 1. Generar clave única en ambos DataFrames
