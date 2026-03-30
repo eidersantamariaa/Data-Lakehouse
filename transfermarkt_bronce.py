@@ -9,7 +9,7 @@ from pyspark.sql import SparkSession
 import pyspark
 import time
 
-base_url = "http://172.25.240.1:8080"
+base_url = " https://righteous-antonina-overenthusiastically.ngrok-free.dev"
 session = requests.Session()
 
 NAMESPACE = "transfermarkt"
