@@ -36,7 +36,7 @@ def run(df1, df2):
 
     # 2. Crear tabla de mapeo usando la clave
     mapeo = (
-        df1[['id_api1', 'clave']]
+        df1[['idTransferMkt', 'clave']]
         .merge(
             df2[['id_api2', 'clave']],
             on='clave',
