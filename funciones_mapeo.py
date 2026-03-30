@@ -80,7 +80,7 @@ def generar_clave(nombre_raw: str, fecha_raw: str) -> str:
     fecha = normalize_date(fecha_raw)
     return f"{inicial}{apellido}{fecha}"  # → OSancet25042000
 
-
+"""
 # ── 2. GENERAR CLAVE EN CADA DATAFRAME ────────────────────────────────────
 
 # Ajusta los nombres de columna a los tuyos
@@ -129,3 +129,4 @@ mapeo = (
 
 print(mapeo[['id_propio', 'id_api1', 'id_api2']])
 print(f"\nSin match: {mapeo['id_api2'].isna().sum()} jugadores")
+"""
