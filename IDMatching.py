@@ -17,7 +17,7 @@ def _resolver_columnas_duplicadas(df, columnas_izq, columnas_der, sufijo_izq="_t
 
     return df
 
-def run(df1, df2, spark):
+def run(df1, df2):
     # 1. Generar clave en ambos DataFrames
     df1['id_propio'] = df1.apply(lambda r: generar_clave(r['name'], r['dateOfBirth']), axis=1)
     df2['id_propio'] = df2.apply(lambda r: generar_clave(r['strPlayer'], r['dateBorn']), axis=1)
@@ -65,19 +65,10 @@ def run(df1, df2, spark):
     print(f"Solo en transfermarkt: {mapeo['id_thesportsdb'].isna().sum()}")
     print(f"Solo en thesportsdb: {mapeo['id_transfermarkt'].isna().sum()}")
 
-    # 6. Subir a Iceberg
-    spark_df = spark.createDataFrame(mapeo)
-    spark.sql("CREATE NAMESPACE IF NOT EXISTS players.mapping")
-    spark_df.writeTo("players.mapping.players_mapping") \
-        .using("iceberg") \
-        .createOrReplace()
-
-    print("Tabla guardada en players.mapping.players_mapping")
-
     return mapeo
 
 
-def unir_fuentes_con_mapeo(df_transfermarkt, df_thesportsdb, mapeo_ids, spark=None):
+def unir_fuentes_con_mapeo(df_transfermarkt, df_thesportsdb, mapeo_ids):
     """
     Une datos de jugadores partiendo de transfermarkt y enriqueciendo con thesportsdb.
 
@@ -148,14 +139,6 @@ def unir_fuentes_con_mapeo(df_transfermarkt, df_thesportsdb, mapeo_ids, spark=No
     print(f"Con datos de ambas APIs: {cruzados.sum()} ({100*cruzados.sum()/total:.1f}%)")
     print(f"Solo con base transfermarkt: {unificado['id_thesportsdb'].isna().sum()}")
     print(f"Solo thesportsdb: {unificado['id_transfermarkt'].isna().sum()}")
-
-    if spark is not None:
-        spark_df = spark.createDataFrame(unificado)
-        spark.sql("CREATE NAMESPACE IF NOT EXISTS players.mapping")
-        spark_df.writeTo("players.mapping.players_unified") \
-            .using("iceberg") \
-            .createOrReplace()
-        print("Tabla guardada en players.mapping.players_unified")
 
     return unificado
 
