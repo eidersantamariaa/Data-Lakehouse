@@ -17,7 +17,7 @@ def _resolver_columnas_duplicadas(df, columnas_izq, columnas_der, sufijo_izq="_t
 
     return df
 
-def run(df1, df2):
+def run(df1, df2, spark):
     # 1. Generar clave en ambos DataFrames
     df1['id_propio'] = df1.apply(lambda r: generar_clave(r['name'], r['dateOfBirth']), axis=1)
     df2['id_propio'] = df2.apply(lambda r: generar_clave(r['strPlayer'], r['dateBorn']), axis=1)
@@ -68,7 +68,7 @@ def run(df1, df2):
     return mapeo
 
 
-def unir_fuentes_con_mapeo(df_transfermarkt, df_thesportsdb, mapeo_ids):
+def unir_fuentes_con_mapeo(df_transfermarkt, df_thesportsdb, mapeo_ids, spark=None):
     """
     Une datos de jugadores partiendo de transfermarkt y enriqueciendo con thesportsdb.
 
@@ -93,84 +93,40 @@ def unir_fuentes_con_mapeo(df_transfermarkt, df_thesportsdb, mapeo_ids):
     if not {"id_transfermarkt", "id_thesportsdb"}.issubset(mapeo.columns):
         raise ValueError("mapeo_ids debe contener 'id_transfermarkt' e 'id_thesportsdb'")
 
-    tm = tm.rename(columns={"id": "id_transfermarkt"})
-    ts = ts.rename(columns={"idPlayer": "id_thesportsdb"})
+    base = mapeo.reset_index(drop=True).copy()
+    base["_row_id"] = range(len(base))
 
-    # Mantiene una fila por par de ids para evitar duplicados al unir.
-    mapeo = mapeo.drop_duplicates(subset=["id_transfermarkt", "id_thesportsdb"]).copy()
-
-    # Mapeo fijo: para cada id_transfermarkt se toma como maximo un id_thesportsdb del mapping.
-    mapeo_por_tm = (
-        mapeo[mapeo["id_transfermarkt"].notna()][["id_transfermarkt", "id_thesportsdb"]]
-        .drop_duplicates(subset=["id_transfermarkt"])
+    tm_join = base.merge(
+        tm,
+        left_on="id_transfermarkt",
+        right_on="id",
+        how="left",
+    )
+    ts_join = base.merge(
+        ts,
+        left_on="id_thesportsdb",
+        right_on="idPlayer",
+        how="left",
     )
 
-    # Base real: todos los jugadores de transfermarkt.
-    base_tm = (
-        tm
-        .merge(mapeo_por_tm, on="id_transfermarkt", how="left")
-        .merge(ts, on="id_thesportsdb", how="left", suffixes=("_tm", "_ts"))
-    )
+    resultado = base.drop(columns=["_row_id"]).copy()
 
-    # Adiciona los jugadores marcados como solo thesportsdb en la tabla de mapping.
-    ts_solo_ids = (
-        mapeo[
-            mapeo["id_transfermarkt"].isna() &
-            mapeo["id_thesportsdb"].notna()
-        ][["id_transfermarkt", "id_thesportsdb"]]
-        .drop_duplicates(subset=["id_thesportsdb"])
-    )
+    columnas_tm = [columna for columna in tm.columns if columna != "id"]
+    columnas_ts = [columna for columna in ts.columns if columna != "idPlayer"]
 
-    ts_solo = (
-        ts_solo_ids
-        .merge(tm, on="id_transfermarkt", how="left")
-        .merge(ts, on="id_thesportsdb", how="left", suffixes=("_tm", "_ts"))
-    )
-
-    unificado = pd.concat([base_tm, ts_solo], ignore_index=True, sort=False)
-
-    unificado = _resolver_columnas_duplicadas(
-        unificado,
-        columnas_izq=tm.columns,
-        columnas_der=ts.columns,
-        sufijo_izq="_tm",
-        sufijo_der="_ts",
-    )
-
-    # Si existe id_transfermarkt hay dato base de transfermarkt; si no, viene solo de thesportsdb.
-    unificado["fuente_base"] = unificado["id_transfermarkt"].apply(
-        lambda x: "transfermarkt" if pd.notna(x) else "thesportsdb"
-    )
-
-    # Normaliza tipos: convierte estructuras complejas a string para evitar conflictos en Spark
-    import numpy as np
-    for col in unificado.columns:
-        # Excluye columnas de ID que deben ser numéricas
-        if col in ['id_transfermarkt', 'id_thesportsdb', 'id_propio']:
+    for columna in columnas_tm:
+        if columna in resultado.columns:
             continue
-        
-        try:
-            # Convierte TODO a string para evitar conflictos de tipo en Spark
-            # Spark no puede mezclar tipos en la misma columna (ej: dict y float)
-            unificado[col] = unificado[col].astype(str)
-        except Exception:
-            # Si falla, intenta con el método apply
-            unificado[col] = unificado[col].apply(lambda x: str(x) if pd.notna(x) else None)
+        resultado[columna] = tm_join[columna]
 
-    total = len(unificado)
-    cruzados = unificado["id_transfermarkt"].notna() & unificado["id_thesportsdb"].notna()
-    print(f"Total jugadores unificados: {total}")
-    print(f"Con datos de ambas APIs: {cruzados.sum()} ({100*cruzados.sum()/total:.1f}%)")
-    print(f"Solo con base transfermarkt: {unificado['id_thesportsdb'].isna().sum()}")
-    print(f"Solo thesportsdb: {unificado['id_transfermarkt'].isna().sum()}")
+    for columna in columnas_ts:
+        if columna in resultado.columns:
+            resultado[columna] = resultado[columna].combine_first(ts_join[columna])
+        else:
+            resultado[columna] = ts_join[columna]
 
-    return unificado
+    columnas_ordenadas = list(base.drop(columns=["_row_id"]).columns)
+    columnas_ordenadas.extend([columna for columna in columnas_tm if columna not in columnas_ordenadas])
+    columnas_ordenadas.extend([columna for columna in columnas_ts if columna not in columnas_ordenadas])
 
-"""
-El resultado será algo así:
-id_propio        | id_transfermarkt | id_thesportsdb
-OSancet25042000  |     1018938      |     34159231    ← en ambas
-JMartin23042006  |     1018939      |     NaN         ← solo transfermarkt
-DOkereke29081997 |     NaN          |     34161149    ← solo thesportsdb
-
-"""
+    return resultado[columnas_ordenadas]
