@@ -30,7 +30,7 @@ def run_silver(config):
     spark = get_spark()
 
     for table_name, transform_fn in config.SILVER_TRANSFORMS.items():
-        bronze_table = f"players.{config.NAMESPACE}.{table_name}_bronce"
+        bronze_table = f"players.{config.NAMESPACE}.players_united"
         silver_table = f"players.{config.NAMESPACE}.{table_name}_plata"
 
         print(f"Transforming {table_name} Bronze → Silver...")
