@@ -17,7 +17,7 @@ def _resolver_columnas_duplicadas(df, columnas_izq, columnas_der, sufijo_izq="_t
 
     return df
 
-def run(df1, df2, spark):
+def run(df1, df2):
     # 1. Generar clave en ambos DataFrames
     df1['id_propio'] = df1.apply(lambda r: generar_clave(r['name'], r['dateOfBirth']), axis=1)
     df2['id_propio'] = df2.apply(lambda r: generar_clave(r['strPlayer'], r['dateBorn']), axis=1)
@@ -68,7 +68,7 @@ def run(df1, df2, spark):
     return mapeo
 
 
-def unir_fuentes_con_mapeo(df_transfermarkt, df_thesportsdb, mapeo_ids, spark=None):
+def unir_fuentes_con_mapeo(df_transfermarkt, df_thesportsdb, mapeo_ids):
     """
     Une datos de jugadores partiendo de transfermarkt y enriqueciendo con thesportsdb.
 
