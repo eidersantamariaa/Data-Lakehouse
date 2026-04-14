@@ -127,6 +127,14 @@ def unir_fuentes_con_mapeo(df_transfermarkt, df_thesportsdb, mapeo_ids, spark=No
         lambda x: "transfermarkt" if pd.notna(x) else "thesportsdb"
     )
 
+    # Normaliza tipos: convierte estructuras complejas a string para evitar conflictos en Spark
+    for col in unificado.columns:
+        # Si la columna tiene tipos mixtos (dict, list, etc), convierte todo a string
+        if any(isinstance(v, (dict, list)) for v in unificado[col] if pd.notna(v)):
+            unificado[col] = unificado[col].apply(
+                lambda x: str(x) if pd.notna(x) else None
+            )
+
     total = len(unificado)
     cruzados = unificado["id_transfermarkt"].notna() & unificado["id_thesportsdb"].notna()
     print(f"Total jugadores unificados: {total}")
