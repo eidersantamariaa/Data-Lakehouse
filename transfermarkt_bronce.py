@@ -36,8 +36,7 @@ def getBig5():
     print("Getting Big 5 Leagues...")
 
     all_leagues = []
-    leagues = {"LaLiga": "Spain"}
-    #leagues = {"Premier League": "England", "LaLiga": "Spain", "Serie A": "Italy", "Bundesliga": "Germany", "Ligue 1": "France"}
+    leagues = {"Premier League": "England", "LaLiga": "Spain", "Serie A": "Italy", "Bundesliga": "Germany", "Ligue 1": "France"}
     big5 = {}
 
     # Función para obtener una liga
