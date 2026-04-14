@@ -128,12 +128,22 @@ def unir_fuentes_con_mapeo(df_transfermarkt, df_thesportsdb, mapeo_ids, spark=No
     )
 
     # Normaliza tipos: convierte estructuras complejas a string para evitar conflictos en Spark
+    import numpy as np
     for col in unificado.columns:
-        # Si la columna tiene tipos mixtos (dict, list, etc), convierte todo a string
-        if any(isinstance(v, (dict, list)) for v in unificado[col] if pd.notna(v)):
-            unificado[col] = unificado[col].apply(
-                lambda x: str(x) if pd.notna(x) else None
-            )
+        try:
+            # Revisa si hay tipos problemáticos (dict, list, numpy arrays)
+            has_complex = False
+            for v in unificado[col].dropna():
+                if isinstance(v, (dict, list, np.ndarray)):
+                    has_complex = True
+                    break
+            if has_complex:
+                unificado[col] = unificado[col].apply(
+                    lambda x: str(x) if pd.notna(x) else None
+                )
+        except Exception:
+            # Si hay error en el tipo de dato, convierte a string de todas formas
+            pass
 
     total = len(unificado)
     cruzados = unificado["id_transfermarkt"].notna() & unificado["id_thesportsdb"].notna()
