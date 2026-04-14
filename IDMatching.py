@@ -99,11 +99,35 @@ def unir_fuentes_con_mapeo(df_transfermarkt, df_thesportsdb, mapeo_ids):
     # Mantiene una fila por par de ids para evitar duplicados al unir.
     mapeo = mapeo.drop_duplicates(subset=["id_transfermarkt", "id_thesportsdb"]).copy()
 
-    unificado = (
-        mapeo
+    # Mapeo fijo: para cada id_transfermarkt se toma como maximo un id_thesportsdb del mapping.
+    mapeo_por_tm = (
+        mapeo[mapeo["id_transfermarkt"].notna()][["id_transfermarkt", "id_thesportsdb"]]
+        .drop_duplicates(subset=["id_transfermarkt"])
+    )
+
+    # Base real: todos los jugadores de transfermarkt.
+    base_tm = (
+        tm
+        .merge(mapeo_por_tm, on="id_transfermarkt", how="left")
+        .merge(ts, on="id_thesportsdb", how="left", suffixes=("_tm", "_ts"))
+    )
+
+    # Adiciona los jugadores marcados como solo thesportsdb en la tabla de mapping.
+    ts_solo_ids = (
+        mapeo[
+            mapeo["id_transfermarkt"].isna() &
+            mapeo["id_thesportsdb"].notna()
+        ][["id_transfermarkt", "id_thesportsdb"]]
+        .drop_duplicates(subset=["id_thesportsdb"])
+    )
+
+    ts_solo = (
+        ts_solo_ids
         .merge(tm, on="id_transfermarkt", how="left")
         .merge(ts, on="id_thesportsdb", how="left", suffixes=("_tm", "_ts"))
     )
+
+    unificado = pd.concat([base_tm, ts_solo], ignore_index=True, sort=False)
 
     unificado = _resolver_columnas_duplicadas(
         unificado,
