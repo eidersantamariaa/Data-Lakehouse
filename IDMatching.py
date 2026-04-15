@@ -161,3 +161,87 @@ def _rellenar_struct_nans(df: pd.DataFrame) -> pd.DataFrame:
                 lambda x: x if isinstance(x, list) else []
             )
     return df
+
+import math
+
+def diagnosticar_columnas_mixtas(df: pd.DataFrame):
+    """
+    Imprime las columnas que tienen tipos mezclados (dict/list con float nan).
+    Úsalo justo antes de createDataFrame para saber exactamente qué falla.
+    """
+    print("=== Diagnóstico de columnas con tipos mixtos ===")
+    problemas = []
+    for col_name in df.columns:
+        tipos = set()
+        for v in df[col_name]:
+            if isinstance(v, dict):
+                tipos.add("dict")
+            elif isinstance(v, list):
+                tipos.add("list")
+            elif isinstance(v, float) and math.isnan(v):
+                tipos.add("nan(float)")
+            elif v is None:
+                tipos.add("None")
+            else:
+                tipos.add(type(v).__name__)
+        
+        if len(tipos) > 1 and ("dict" in tipos or "list" in tipos):
+            problemas.append(col_name)
+            print(f"  ⚠️  {col_name}: {tipos}")
+    
+    if not problemas:
+        print("  ✅ Sin columnas conflictivas")
+    return problemas
+
+
+def _rellenar_struct_nans_robusto(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Versión robusta: usa math.isnan para detectar float NaN (que pandas
+    introduce al hacer concat), no solo isinstance(x, dict).
+    También maneja dicts anidados recursivamente.
+    """
+    def es_nan(v):
+        """True si el valor es float NaN o None."""
+        if v is None:
+            return True
+        if isinstance(v, float) and math.isnan(v):
+            return True
+        return False
+
+    def dict_vacio_recursivo(d: dict) -> dict:
+        """Crea un dict con las mismas claves pero todos los valores a None,
+        respetando dicts anidados para que el StructType sea uniforme."""
+        resultado = {}
+        for k, v in d.items():
+            if isinstance(v, dict):
+                resultado[k] = dict_vacio_recursivo(v)
+            elif isinstance(v, list):
+                resultado[k] = []
+            else:
+                resultado[k] = None
+        return resultado
+
+    df = df.copy()
+    for col_name in df.columns:
+        # Buscar el primer dict/list real (no nan) de la columna
+        primer_dict = None
+        primer_list = None
+        for v in df[col_name]:
+            if isinstance(v, dict) and primer_dict is None:
+                primer_dict = v
+            if isinstance(v, list) and primer_list is None:
+                primer_list = v
+            if primer_dict and primer_list:
+                break
+
+        if primer_dict is not None:
+            plantilla = dict_vacio_recursivo(primer_dict)
+            df[col_name] = df[col_name].apply(
+                lambda x: x if isinstance(x, dict) else plantilla
+            )
+        elif primer_list is not None:
+            df[col_name] = df[col_name].apply(
+                lambda x: x if isinstance(x, list) else []
+            )
+
+    return df
