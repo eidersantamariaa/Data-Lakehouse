@@ -5,7 +5,7 @@ NAMESPACE = "mapping"
 
 SILVER_TRANSFORMS = {
     "players": lambda df: clean_basic(df).select(
-        col("id_transfermarkt").alias("id"),
+        col("id_transfermarkt"),
         col("id_thesportsdb"),
         normalize_text_udf(col("tm_name")).alias("name"),
         normalize_text_udf(col("tm_fullName")).alias("fullName"),
@@ -19,22 +19,22 @@ SILVER_TRANSFORMS = {
         normalize_text_udf(array_join(col("tm_citizenship"), ", ")).alias("citizenship"),
 
         normalize_text_udf(when(
-            col("tm_placeOfBirth.city").isNotNull() & col("tm_placeOfBirth.country").isNotNull(),
-            concat(col("tm_placeOfBirth.city"), lit(", "), col("tm_placeOfBirth.country"))
-        ).when(col("tm_placeOfBirth.country").isNull(),
-            col("tm_placeOfBirth.city")
+            col("tm_placeOfBirth").getField("city").isNotNull() & col("tm_placeOfBirth").getField("country").isNotNull(),
+            concat(col("tm_placeOfBirth").getField("city"), lit(", "), col("tm_placeOfBirth").getField("country"))
+        ).when(col("tm_placeOfBirth").getField("country").isNull(),
+            col("tm_placeOfBirth").getField("city")
         ).otherwise(
-            col("tm_placeOfBirth.country")
+            col("tm_placeOfBirth").getField("country")
         )).alias("placeOfBirth"),
 
         normalize_text_udf(trim(regexp_replace(
-            concat_ws(", ", col("tm_position.main"), array_join(col("tm_position.other"), ", ")),
+            concat_ws(", ", col("tm_position").getField("main"), array_join(col("tm_position").getField("other"), ", ")),
             ",\\s*$", ""
         ))).alias("positions"),
 
-        col("tm_club.id").alias("clubId"),
-        normalize_text_udf(col("tm_club.name")).alias("clubName"),
-        normalize_date_udf(col("tm_club.joined")).alias("clubJoined"),
-        normalize_date_udf(col("tm_club.contractExpires")).alias("contractExpires"),
+        col("tm_club").getField("id").alias("clubId"),
+        normalize_text_udf(col("tm_club").getField("name")).alias("clubName"),
+        normalize_date_udf(col("tm_club").getField("joined")).alias("clubJoined"),
+        normalize_date_udf(col("tm_club").getField("contractExpires")).alias("contractExpires"),
     ).fillna("")
 }
