@@ -109,6 +109,18 @@ def unir_fuentes_con_mapeo(df_transfermarkt, df_thesportsdb, mapeo_ids):
     cols_a_drop = [c for c in ["id_propio"] if c in resultado.columns]
     resultado = resultado.drop(columns=cols_a_drop)
 
+    resultado = pd.concat(
+        [filas_ambos, filas_solo_tm, filas_solo_ts],
+        ignore_index=True,
+        sort=False
+    )
+
+    cols_a_drop = [c for c in ["id_propio"] if c in resultado.columns]
+    resultado = resultado.drop(columns=cols_a_drop)
+
+    # ✅ Rellenar structs antes de pasar a Spark
+    resultado = _rellenar_struct_nans(resultado)
+
     # Resumen
     total = len(resultado)
     ambos    = resultado["id_transfermarkt"].notna() & resultado["id_thesportsdb"].notna()
@@ -121,3 +133,31 @@ def unir_fuentes_con_mapeo(df_transfermarkt, df_thesportsdb, mapeo_ids):
     print(f"  Solo thesportsdb                 : {solo_ts.sum()} ({100*solo_ts.sum()/total:.1f}%)")
 
     return resultado
+
+def _rellenar_struct_nans(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Para cada columna con dicts, sustituye NaN por un dict vacío
+    con las mismas claves que el primer dict real encontrado.
+    Así Spark infiere un StructType uniforme en todas las filas.
+    """
+    df = df.copy()
+    for col_name in df.columns:
+        muestra = df[col_name].dropna()
+        if muestra.empty:
+            continue
+
+        # Buscar el primer valor que sea dict
+        primer_dict = next((v for v in muestra if isinstance(v, dict)), None)
+        primer_list = next((v for v in muestra if isinstance(v, list)), None)
+
+        if primer_dict is not None:
+            # Dict vacío con las mismas claves → Spark infiere schema uniforme
+            dict_vacio = {k: None for k in primer_dict.keys()}
+            df[col_name] = df[col_name].apply(
+                lambda x: x if isinstance(x, dict) else dict_vacio
+            )
+        elif primer_list is not None:
+            df[col_name] = df[col_name].apply(
+                lambda x: x if isinstance(x, list) else []
+            )
+    return df
