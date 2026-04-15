@@ -3,20 +3,6 @@ import pandas as pd
 from funciones_mapeo import generar_clave
 from rapidfuzz import process, fuzz
 
-
-def _resolver_columnas_duplicadas(df, columnas_izq, columnas_der, sufijo_izq="_tm", sufijo_der="_ts"):
-    """Combina columnas con el mismo nombre priorizando valores de la izquierda."""
-    comunes = (set(columnas_izq) & set(columnas_der)) - {"id_transfermarkt", "id_thesportsdb"}
-
-    for col in comunes:
-        col_izq = f"{col}{sufijo_izq}"
-        col_der = f"{col}{sufijo_der}"
-        if col_izq in df.columns and col_der in df.columns:
-            df[col] = df[col_izq].combine_first(df[col_der])
-            df = df.drop(columns=[col_izq, col_der])
-
-    return df
-
 def run(df1, df2):
     # 1. Generar clave en ambos DataFrames
     df1['id_propio'] = df1.apply(lambda r: generar_clave(r['name'], r['dateOfBirth']), axis=1)
@@ -81,7 +67,6 @@ def unir_fuentes_con_mapeo(df_transfermarkt, df_thesportsdb, mapeo_ids):
     if mapeo_ids is None or mapeo_ids.empty:
         raise ValueError("mapeo_ids no puede ser None ni estar vacio")
 
-    # Copias defensivas para no modificar DataFrames de entrada.
     tm = df_transfermarkt.copy()
     ts = df_thesportsdb.copy()
     mapeo = mapeo_ids.copy()
@@ -93,40 +78,46 @@ def unir_fuentes_con_mapeo(df_transfermarkt, df_thesportsdb, mapeo_ids):
     if not {"id_transfermarkt", "id_thesportsdb"}.issubset(mapeo.columns):
         raise ValueError("mapeo_ids debe contener 'id_transfermarkt' e 'id_thesportsdb'")
 
-    base = mapeo.reset_index(drop=True).copy()
-    base["_row_id"] = range(len(base))
+    # Prefijar columnas para no perder el origen tras el merge
+    tm_prefixed = tm.add_prefix("tm_").rename(columns={"tm_id": "id_transfermarkt"})
+    ts_prefixed = ts.add_prefix("ts_").rename(columns={"ts_idPlayer": "id_thesportsdb"})
 
-    tm_join = base.merge(
-        tm,
-        left_on="id_transfermarkt",
-        right_on="id",
-        how="left",
+    # --- Caso 1: solo transfermarkt (id_thesportsdb es NaN) ---
+    mapeo_solo_tm = mapeo[mapeo["id_thesportsdb"].isna() & mapeo["id_transfermarkt"].notna()]
+    filas_solo_tm = mapeo_solo_tm.merge(tm_prefixed, on="id_transfermarkt", how="left")
+
+    # --- Caso 2: ambos IDs presentes ---
+    mapeo_ambos = mapeo[mapeo["id_transfermarkt"].notna() & mapeo["id_thesportsdb"].notna()]
+    filas_ambos = (
+        mapeo_ambos
+        .merge(tm_prefixed, on="id_transfermarkt", how="left")
+        .merge(ts_prefixed, on="id_thesportsdb", how="left")
     )
-    ts_join = base.merge(
-        ts,
-        left_on="id_thesportsdb",
-        right_on="idPlayer",
-        how="left",
+
+    # --- Caso 3: solo thesportsdb (id_transfermarkt es NaN) ---
+    mapeo_solo_ts = mapeo[mapeo["id_transfermarkt"].isna() & mapeo["id_thesportsdb"].notna()]
+    filas_solo_ts = mapeo_solo_ts.merge(ts_prefixed, on="id_thesportsdb", how="left")
+
+    # --- Unir los tres grupos ---
+    resultado = pd.concat(
+        [filas_ambos, filas_solo_tm, filas_solo_ts],
+        ignore_index=True,
+        sort=False          # mantiene el orden de columnas del primer df
     )
 
-    resultado = base.drop(columns=["_row_id"]).copy()
+    # Limpiar columnas de mapeo intermedias si no se necesitan
+    cols_a_drop = [c for c in ["id_propio"] if c in resultado.columns]
+    resultado = resultado.drop(columns=cols_a_drop)
 
-    columnas_tm = [columna for columna in tm.columns if columna != "id"]
-    columnas_ts = [columna for columna in ts.columns if columna != "idPlayer"]
+    # Resumen
+    total = len(resultado)
+    ambos    = resultado["id_transfermarkt"].notna() & resultado["id_thesportsdb"].notna()
+    solo_tm  = resultado["id_transfermarkt"].notna() & resultado["id_thesportsdb"].isna()
+    solo_ts  = resultado["id_transfermarkt"].isna()  & resultado["id_thesportsdb"].notna()
 
-    for columna in columnas_tm:
-        if columna in resultado.columns:
-            continue
-        resultado[columna] = tm_join[columna]
+    print(f"Total jugadores en tabla unificada : {total}")
+    print(f"  Cruzados (ambas fuentes)         : {ambos.sum()}   ({100*ambos.sum()/total:.1f}%)")
+    print(f"  Solo transfermarkt               : {solo_tm.sum()} ({100*solo_tm.sum()/total:.1f}%)")
+    print(f"  Solo thesportsdb                 : {solo_ts.sum()} ({100*solo_ts.sum()/total:.1f}%)")
 
-    for columna in columnas_ts:
-        if columna in resultado.columns:
-            resultado[columna] = resultado[columna].combine_first(ts_join[columna])
-        else:
-            resultado[columna] = ts_join[columna]
-
-    columnas_ordenadas = list(base.drop(columns=["_row_id"]).columns)
-    columnas_ordenadas.extend([columna for columna in columnas_tm if columna not in columnas_ordenadas])
-    columnas_ordenadas.extend([columna for columna in columnas_ts if columna not in columnas_ordenadas])
-
-    return resultado[columnas_ordenadas]
+    return resultado
