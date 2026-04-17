@@ -279,7 +279,9 @@ def run(cli_args=None):
         "by_operation": by_operation,
         "cow_snapshots": cow_snaps,
         "mor_snapshots": mor_snaps,
-        "rows" : base_rows
+        "rows" : base_rows,
+        "updates_rows": updates_rows,
+        "deletes_rows": deletes_rows,
     }
 
 
