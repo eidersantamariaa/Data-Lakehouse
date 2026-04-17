@@ -158,7 +158,7 @@ def snapshot_count(spark, table_name):
 
 def run(cli_args=None):
     parser = argparse.ArgumentParser(description="Benchmark COW vs MOR con datos reales")
-    parser.add_argument("--source-table", required=True, help="Tabla fuente completa. Ej: players.thesportsdb.players_bronce")
+    parser.add_argument("--source-table", help="Tabla fuente completa. Ej: players.thesportsdb.players_bronce")
     parser.add_argument("--dataset", required=True, help="Dataset ingerido (namespace), p.ej. thesportsdb o transfermarkt")
     parser.add_argument("--entity", required=True, choices=["players", "teams", "leagues"], help="Entidad ingerida a benchmarkear")
     parser.add_argument("--namespace", required=True)
