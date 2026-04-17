@@ -158,16 +158,16 @@ def snapshot_count(spark, table_name):
 
 def run(cli_args=None):
     parser = argparse.ArgumentParser(description="Benchmark COW vs MOR con datos reales")
-    parser.add_argument("--source-table", default=None, help="Tabla fuente completa. Ej: players.thesportsdb.players_bronce")
-    parser.add_argument("--dataset", default="thesportsdb", help="Dataset ingerido (namespace), p.ej. thesportsdb o transfermarkt")
-    parser.add_argument("--entity", default="players", choices=["players", "teams", "leagues"], help="Entidad ingerida a benchmarkear")
-    parser.add_argument("--namespace", default="thesportsdb")
-    parser.add_argument("--base-table", default="bench_real")
-    parser.add_argument("--key-col", default="id")
-    parser.add_argument("--update-col", default=None)
-    parser.add_argument("--sample-rows", type=int, default=200000)
-    parser.add_argument("--update-ratio", type=float, default=0.3)
-    parser.add_argument("--keep-tables", action="store_true")
+    parser.add_argument("--source-table", required=True, help="Tabla fuente completa. Ej: players.thesportsdb.players_bronce")
+    parser.add_argument("--dataset", required=True, help="Dataset ingerido (namespace), p.ej. thesportsdb o transfermarkt")
+    parser.add_argument("--entity", required=True, choices=["players", "teams", "leagues"], help="Entidad ingerida a benchmarkear")
+    parser.add_argument("--namespace", required=True)
+    parser.add_argument("--base-table", required=True, help="Nombre base para las tablas de benchmark (sin namespace ni sufijo). Ej: bench_players_real")
+    parser.add_argument("--key-col", default="id", required=True)
+    parser.add_argument("--update-col", default=None, required=False)
+    parser.add_argument("--sample-rows", type=int, default=200000, required=False)
+    parser.add_argument("--update-ratio", type=float, default=0.3, required=False)
+    parser.add_argument("--keep-tables", action="store_true", required=False)
     # In notebooks, sys.argv includes extra kernel args. parse_known_args avoids failing there.
     args, _ = parser.parse_known_args(cli_args)
 
@@ -279,6 +279,7 @@ def run(cli_args=None):
         "by_operation": by_operation,
         "cow_snapshots": cow_snaps,
         "mor_snapshots": mor_snaps,
+        "rows" : base_rows
     }
 
 
