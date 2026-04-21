@@ -87,7 +87,6 @@ def detect_update_column(df, key_col, explicit_update_col):
 
 def build_base_df(source_df, key_col, sample_rows):
     if sample_rows and sample_rows > 0:
-        # Intento de estabilidad: ordenar por key si existe.
         if key_col in source_df.columns:
             return source_df.orderBy(F.col(key_col)).limit(sample_rows)
         return source_df.limit(sample_rows)
@@ -108,6 +107,12 @@ def count_update_rows(base_df, key_col, update_ratio):
 
 def count_delete_rows(base_df, key_col):
     return base_df.where(F.pmod(F.abs(F.hash(F.col(key_col))), F.lit(10)) == F.lit(0)).count()
+
+
+def count_merge_rows(base_df, key_col, update_ratio):
+    """Misma fracción que el UPDATE: filas que harán MATCHED en el MERGE."""
+    threshold = int(max(0.0, min(1.0, float(update_ratio))) * 100)
+    return base_df.where(F.pmod(F.abs(F.hash(F.col(key_col))), F.lit(100)) < F.lit(threshold)).count()
 
 
 def update_slice(spark, table_name, key_col, update_col, update_ratio, update_type):
@@ -134,6 +139,49 @@ def update_slice(spark, table_name, key_col, update_col, update_ratio, update_ty
         )
 
     return timed(f"{table_name} merge_update", _run)
+
+
+def merge_slice(spark, table_name, key_col, update_col, update_ratio, update_type, base_df):
+    """
+    MERGE INTO la tabla usando un subconjunto de base_df como fuente.
+    - WHEN MATCHED  → UPDATE del update_col (misma fracción que update_ratio)
+    - WHEN NOT MATCHED → INSERT (no habrá filas nuevas porque la fuente es subconjunto de la tabla)
+    El sufijo aplicado es distinto al del UPDATE ('_m' / +2) para que el resultado sea diferente
+    y no quede cacheado por Spark.
+    """
+    threshold = int(max(0.0, min(1.0, float(update_ratio))) * 100)
+
+    subset_df = base_df.where(
+        F.pmod(F.abs(F.hash(F.col(key_col))), F.lit(100)) < F.lit(threshold)
+    )
+
+    if update_type == "numeric":
+        source_df = subset_df.withColumn(update_col, F.col(update_col) + 2)
+    elif update_type == "string":
+        source_df = subset_df.withColumn(update_col, F.concat(F.col(update_col), F.lit("_m")))
+    elif update_type == "timestamp":
+        source_df = subset_df.withColumn(update_col, F.current_timestamp())
+    elif update_type == "date":
+        source_df = subset_df.withColumn(update_col, F.current_date())
+    else:
+        raise ValueError(f"Tipo de merge no soportado: {update_type}")
+
+    source_df.createOrReplaceTempView("_bench_merge_source")
+
+    def _run():
+        spark.sql(
+            f"""
+            MERGE INTO {table_name} t
+            USING _bench_merge_source s
+              ON t.{key_col} = s.{key_col}
+            WHEN MATCHED THEN
+                UPDATE SET t.{update_col} = s.{update_col}
+            WHEN NOT MATCHED THEN
+                INSERT *
+            """
+        )
+
+    return timed(f"{table_name} merge_op", _run)
 
 
 def delete_slice(spark, table_name, key_col):
@@ -168,7 +216,6 @@ def run(cli_args=None):
     parser.add_argument("--sample-rows", type=int, default=200000, required=False)
     parser.add_argument("--update-ratio", type=float, default=0.3, required=False)
     parser.add_argument("--keep-tables", action="store_true", required=False)
-    # In notebooks, sys.argv includes extra kernel args. parse_known_args avoids failing there.
     args, _ = parser.parse_known_args(cli_args)
 
     spark = get_spark()
@@ -198,6 +245,7 @@ def run(cli_args=None):
             f"No se puede modificar automaticamente la columna {update_col} (tipo {update_dt}). "
             "Usa --update-col con una columna string/numerica/timestamp/date."
         )
+
     base_df = build_base_df(source_df, args.key_col, args.sample_rows).cache()
     base_rows = base_df.count()
 
@@ -210,6 +258,7 @@ def run(cli_args=None):
 
     updates_rows = count_update_rows(base_df, args.key_col, args.update_ratio)
     deletes_rows = count_delete_rows(base_df, args.key_col)
+    merge_rows   = count_merge_rows(base_df, args.key_col, args.update_ratio)
 
     print("=== Config ===")
     print(f"source_table: {source_table}")
@@ -219,6 +268,7 @@ def run(cli_args=None):
     print(f"sample_rows: {base_rows}")
     print(f"updates_rows: {updates_rows}")
     print(f"deletes_rows: {deletes_rows}")
+    print(f"merge_rows:   {merge_rows}")
 
     results = []
     for table_name in [cow_table, mor_table]:
@@ -230,6 +280,9 @@ def run(cli_args=None):
 
         results.append(delete_slice(spark, table_name, args.key_col))
         write_audit_log(spark, args.namespace, table_name, "BENCH_DELETE", deletes_rows)
+
+        results.append(merge_slice(spark, table_name, args.key_col, update_col, args.update_ratio, update_type, base_df))
+        write_audit_log(spark, args.namespace, table_name, "BENCH_MERGE", merge_rows)
 
         results.append(read_full(spark, table_name))
         current_rows = spark.read.table(table_name).count()
@@ -247,7 +300,7 @@ def run(cli_args=None):
     print(f"{mor_table}: {mor_snaps}")
 
     print("\n=== Summary by operation ===")
-    ops = ["initial_load", "merge_update", "delete_10pct", "read_count"]
+    ops = ["initial_load", "merge_update", "delete_10pct", "merge_op", "read_count"]
     by_operation = {}
     for op in ops:
         cow_val = next(v for k, v in results if k == f"{cow_table} {op}")
@@ -279,9 +332,10 @@ def run(cli_args=None):
         "by_operation": by_operation,
         "cow_snapshots": cow_snaps,
         "mor_snapshots": mor_snaps,
-        "rows" : base_rows,
+        "rows": base_rows,
         "updates_rows": updates_rows,
         "deletes_rows": deletes_rows,
+        "merge_rows": merge_rows,
     }
 
 
