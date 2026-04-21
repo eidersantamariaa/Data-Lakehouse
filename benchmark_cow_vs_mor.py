@@ -166,7 +166,7 @@ def merge_slice(spark, table_name, key_col, update_col, update_ratio, update_typ
     else:
         raise ValueError(f"Tipo de merge no soportado: {update_type}")
 
-    source_df.createOrReplaceTempView("_bench_merge_source")
+    source_df.localCheckpoint().createOrReplaceTempView("_bench_merge_source")
 
     def _run():
         spark.sql(
