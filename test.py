@@ -133,7 +133,7 @@ def test_concurrent_appends(spark: SparkSession) -> List[TaskResult]:
         data = [(100 + i, "hilo_A", f"A_{i}", now) for i in range(5)]
         df = spark.createDataFrame(data, schema)
         df.writeTo(TABLE).append()
-        snap = spark.sql(f"SELECT snapshot_id FROM {CATALOG}.{DATABASE}.{TABLE}.snapshots ORDER BY committed_at DESC LIMIT 1").collect()[0][0]
+        snap = spark.sql(f"SELECT snapshot_id FROM {TABLE}.snapshots ORDER BY committed_at DESC LIMIT 1").collect()[0][0]
         return 5, snap, {}
 
     def append_b():
@@ -141,7 +141,7 @@ def test_concurrent_appends(spark: SparkSession) -> List[TaskResult]:
         data = [(200 + i, "hilo_B", f"B_{i}", now) for i in range(5)]
         df = spark.createDataFrame(data, schema)
         df.writeTo(TABLE).append()
-        snap = spark.sql(f"SELECT snapshot_id FROM {CATALOG}.{DATABASE}.{TABLE}.snapshots ORDER BY committed_at DESC LIMIT 1").collect()[0][0]
+        snap = spark.sql(f"SELECT snapshot_id FROM {TABLE}.snapshots ORDER BY committed_at DESC LIMIT 1").collect()[0][0]
         return 5, snap, {}
 
     barrier = threading.Barrier(2)
@@ -451,7 +451,7 @@ def test_benchmark(spark: SparkSession) -> List[TaskResult]:
 
     # SNAPSHOT count
     results.append(_run_timed("LIST snapshots", lambda: (
-        spark.sql(f"SELECT COUNT(*) FROM {CATALOG}.{DATABASE}.{TABLE}.snapshots").collect()[0][0],
+        spark.sql(f"SELECT COUNT(*) FROM {TABLE}.snapshots").collect()[0][0],
         None, {}
     )))
 
