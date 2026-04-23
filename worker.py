@@ -130,6 +130,8 @@ log_info(f"[W{worker_id}] ¡GO! Arrancando operaciones ({operation})")
 # ── OPERACIONES ────────────────────────────────────────────
 spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {CATALOG}.{DATABASE}")
 
+spark.sql(f"DROP TABLE IF EXISTS {TARGET}")
+
 spark.sql(f"""
     CREATE TABLE IF NOT EXISTS {TARGET} (
         id     INT,
@@ -168,7 +170,7 @@ for iteration in range(NUM_ITERATIONS):
             rows = 1
 
         elif operation == "delete":
-            spark.sql(f"DELETE FROM {TARGET} WHERE source = 'seed' AND id = {target_filter}")
+            spark.sql(f"DELETE FROM {TARGET} WHERE id = {iteration}")
             rows = 1
 
         elif operation == "update":
