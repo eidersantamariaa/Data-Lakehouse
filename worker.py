@@ -105,6 +105,11 @@ builder = builder.config("spark.driver.extraJavaOptions",   "-Daws.requestChecks
 builder = builder.config("spark.sql.catalog.players.s3.access-key-id",     "GK5f421d5f440758f74b0e0312")
 builder = builder.config("spark.sql.catalog.players.s3.secret-access-key", "409baa63477885db12cd1db0a518748c5e83e971b5e8cf2129fe6c7498de125d")
 
+# SparkSession — pon retries de vuelta
+builder = builder.config("spark.sql.catalog.players.commit.retry.num-retries",  "4")
+builder = builder.config("spark.sql.catalog.players.commit.retry.min-wait-ms",  "100")
+builder = builder.config("spark.sql.catalog.players.commit.retry.max-wait-ms",  "2000")
+
 spark = builder.getOrCreate()
 spark.sparkContext.setLogLevel("ERROR")
 
@@ -172,12 +177,16 @@ for iteration in range(NUM_ITERATIONS):
             rows = 1
 
         elif operation == "update":
+            t_inicio = time.time()
             spark.sql(f"""
                 UPDATE {TARGET}
-                SET value = 'updated_by_w{worker_id}_iter{iteration}'
+                SET value = 'w{worker_id}_iter{iteration}',
+                    source = 'worker_{worker_id}'
                 WHERE id = {target_filter}
             """)
+            t_fin = time.time()
             rows = 1
+            extra_ms = (t_fin - t_inicio) * 1000
 
         elif operation == "read":
             rows = spark.table(TARGET).count()
