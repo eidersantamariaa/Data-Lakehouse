@@ -32,7 +32,7 @@ worker_id     = int(sys.argv[1])
 operation     = sys.argv[2]          # insert | delete | update | read
 target_filter = sys.argv[3]          # valor de filtro o identificador
 
-# ── CONFIG ─────────────────────────────────────────────────
+# ── CONFIG ───────────────────────────────────────────────── 
 CATALOG  = "players"
 DATABASE = "concurrency_tests"
 TARGET   = f"{CATALOG}.{DATABASE}.concurrent_table"
@@ -129,8 +129,6 @@ log_info(f"[W{worker_id}] ¡GO! Arrancando operaciones ({operation})")
 
 # ── OPERACIONES ────────────────────────────────────────────
 spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {CATALOG}.{DATABASE}")
-
-spark.sql(f"DROP TABLE IF EXISTS {TARGET}")
 
 spark.sql(f"""
     CREATE TABLE IF NOT EXISTS {TARGET} (
