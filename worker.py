@@ -107,6 +107,7 @@ builder = builder.config("spark.sql.catalog.players.s3.secret-access-key", "409b
 
 spark = builder.getOrCreate()
 spark.sparkContext.setLogLevel("ERROR")
+
 log_info(f"[W{worker_id}] SparkSession lista")
 
 
@@ -127,6 +128,22 @@ log_info(f"[W{worker_id}] ¡GO! Arrancando operaciones ({operation})")
 
 
 # ── OPERACIONES ────────────────────────────────────────────
+spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {CATALOG}.{DATABASE}")
+
+spark.sql(f"""
+    CREATE TABLE IF NOT EXISTS {TARGET} (
+        id     INT,
+        source STRING,
+        value  STRING,
+        ts     TIMESTAMP
+    ) USING iceberg
+    TBLPROPERTIES (
+        'write.merge.mode'         = 'merge-on-read',
+        'commit.retry.num-retries' = '4',
+        'commit.retry.min-wait-ms' = '100'
+    )
+""")
+
 schema = StructType([
     StructField("id",     IntegerType()),
     StructField("source", StringType()),
