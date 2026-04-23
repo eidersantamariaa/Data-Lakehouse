@@ -163,14 +163,14 @@ for iteration in range(NUM_ITERATIONS):
         if operation == "insert":
             base_id = worker_id * 1000 + iteration
             df = spark.createDataFrame(
-                [(base_id, f"worker_{worker_id}", f"iter_{iteration}", datetime.now())],
+                [(base_id, "seed", f"iter_{iteration}", datetime.now())],
                 schema
             )
             df.writeTo(TARGET).append()
             rows = 1
 
         elif operation == "delete":
-            spark.sql(f"DELETE FROM {TARGET} WHERE id = {iteration}")
+            spark.sql(f"DELETE FROM {TARGET} WHERE source = 'seed'")
             rows = 1
 
         elif operation == "update":
