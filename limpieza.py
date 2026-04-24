@@ -47,6 +47,10 @@ def run_silver(config):
 def normalize_text(name):
     if name is None:
         return ""
+    if isinstance(name, bool):
+        return ""
+    if not isinstance(name, str):
+        name = str(name)
     name = name.lower().strip()
     name = unicodedata.normalize('NFKD', name).encode('ascii', 'ignore').decode()
     return name
