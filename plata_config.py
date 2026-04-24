@@ -20,14 +20,13 @@ SILVER_TRANSFORMS = {
         when(col("tm_placeOfBirth").isNotNull(), normalize_text_udf(col("tm_placeOfBirth"))).otherwise(normalize_text_udf(col("ts_strBirthLocation"))).alias("placeOfBirth"),
         when(col("tm_position").isNotNull(), normalize_text_udf(col("tm_position"))).otherwise(normalize_text_udf(col("ts_strPosition"))).alias("position"),
 
-         when(col("tm_club").isNotNull(),
-            col("tm_club")[2].alias("clubId"),
-            normalize_text_udf(col("tm_club")[4]).alias("clubName"),
-            normalize_date_udf(col("tm_club")[3]).alias("clubJoined"),
-            normalize_date_udf(col("tm_club")[0]).alias("contractExpires"),
-        ).otherwise(
-            normalize_text_udf(col("ts_strTeam").alias("clubName")),
-            normalize_date_udf(col("ts_dateSigned").alias("clubJoined")),
-        )
+        when(col("tm_club").isNotNull(), col("tm_club")[2]).otherwise(lit("ts_idTeam")).alias("clubId"),
+        when(col("tm_club").isNotNull(), normalize_text_udf(col("tm_club")[4]))
+            .otherwise(normalize_text_udf(col("ts_strTeam"))).alias("clubName"),
+        when(col("tm_club").isNotNull(), normalize_date_udf(col("tm_club")[3]))
+            .otherwise(normalize_date_udf(col("ts_dateSigned"))).alias("clubJoined"),
+        when(col("tm_club").isNotNull(), normalize_date_udf(col("tm_club")[0]))
+            .otherwise(lit("")).alias("contractExpires"),
+        
     ).fillna("")
 }
