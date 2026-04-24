@@ -1,8 +1,9 @@
 from pyspark.sql.functions import col, trim, udf, coalesce
-from pyspark.sql.types import StringType, FloatType
+from pyspark.sql.types import StringType, FloatType, DecimalType
 from ingesta import get_spark
 import re
 import unicodedata
+from decimal import Decimal
 
 def clean_basic(df, primary_key=None):
     # Si no se pasa primary_key, busca automáticamente
@@ -61,24 +62,24 @@ def normalize_height(value):
     v = v.replace("'", "ft")
     v = v.replace("\"", "in")
     if "cm" in v:
-        return float(re.findall(r"\d+\.?\d*", v)[0])
+        return Decimal(re.findall(r"\d+\.?\d*", v)[0])
     
     if "ft" in v:
         ft = re.findall(r"(\d+)\s*ft", v)
         inch = re.findall(r"(\d+)\s*in", v)
         ft = float(ft[0]) if ft else 0
         inch = float(inch[0]) if inch else 0
-        return float((ft * 30.48) + (inch * 2.54))
+        return Decimal(str(round((ft * 30.48) + (inch * 2.54), 1)))
     
     if "m" in v:
-        return float(float(re.findall(r"\d+\.?\d*", v)[0]) * 100)
+        return Decimal(str(round(float(re.findall(r"\d+\.?\d*", v)[0]) * 100, 1)))
     
     if re.fullmatch(r"\d+\.?\d*", v.strip()):
         n = float(re.findall(r"\d+\.?\d*", v)[0])
         if n >= 100:      # ya está en cm (ej: 179, 180)
-            return round(n, 1)
+            return Decimal(str(round(n, 1)))
         else:             # está en metros (ej: 1.79, 1.80)
-            return round(n * 100, 1)
+            return Decimal(str(round(n * 100, 1)))
     return None
 """
 test_cases = [
@@ -284,7 +285,7 @@ def normalize_position(val):
 
 normalize_position_udf = udf(normalize_position, StringType())
 normalize_text_udf     = udf(normalize_text, StringType())
-normalize_height_udf   = udf(normalize_height, FloatType())
+normalize_height_udf   = udf(normalize_height, DecimalType(5, 1))
 normalize_weight_udf   = udf(normalize_weight, FloatType())
 normalize_currency_udf = udf(normalize_currency, StringType())
 normalize_date_udf     = udf(normalize_date, StringType())
