@@ -1,4 +1,4 @@
-from pyspark.sql.functions import col, trim, udf
+from pyspark.sql.functions import col, trim, udf, coalesce
 from pyspark.sql.types import StringType, FloatType
 from ingesta import get_spark
 import re
@@ -8,7 +8,10 @@ def clean_basic(df, primary_key=None):
     # Si no se pasa primary_key, busca automáticamente
     if primary_key is None:
         candidates = [c for c in df.columns if c.lower().startswith("id")]
-        primary_key = candidates[0] if candidates else None
+        # Filtra filas donde TODOS los ids son nulos, no solo el primero
+        if candidates:
+            df = df.filter(coalesce(*[col(c) for c in candidates]).isNotNull())
+            df = df.dropDuplicates(candidates)
 
     for col_name in df.columns:
         stripped = col_name.strip()
@@ -35,7 +38,6 @@ def run_silver(config):
 
         print(f"Transforming {table_name} Bronze → Silver...")
         df_bronze = spark.table(bronze_table)
-        df_bronze.select("tm_club").printSchema()
         df_silver = transform_fn(df_bronze)
         df_silver.writeTo(silver_table).createOrReplace()
         print(f"✅ {silver_table}: {df_silver.count()} rows")
