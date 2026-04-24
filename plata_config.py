@@ -16,9 +16,9 @@ SILVER_TRANSFORMS = {
         normalize_text_udf(normalize_currency_udf(col("tm_marketValue"))).alias("marketValue (€)"),
         when(col("tm_isRetired").isNotNull(), normalize_text_udf(col("tm_isRetired"))).otherwise(normalize_text_udf(col("ts_strStatus"))).alias("isRetired"),
         normalize_text_udf(normalize_weight_udf(col("ts_strWeight"))).alias("weight (kg)"),
-        when(col("tm_citizenship").isNotNull(), normalize_text_udf(col("tm_citizenship"))).otherwise(normalize_text_udf(col("ts_strNationality"))).alias("citizenship"),
-        when(col("tm_placeOfBirth").isNotNull(), normalize_text_udf(col("tm_placeOfBirth"))).otherwise(normalize_text_udf(col("ts_strBirthLocation"))).alias("placeOfBirth"),
-        when(col("tm_position").isNotNull(), normalize_text_udf(col("tm_position"))).otherwise(normalize_text_udf(col("ts_strPosition"))).alias("position"),
+        when(col("tm_citizenship").isNotNull(), normalize_text_udf(array_join(col("tm_citizenship"), ", "))).otherwise(normalize_text_udf(col("ts_strNationality"))).alias("citizenship"),
+        when(col("tm_placeOfBirth").isNotNull(), normalize_text_udf(array_join(col("tm_placeOfBirth"), ", "))).otherwise(normalize_text_udf(col("ts_strBirthLocation"))).alias("placeOfBirth"),
+        when(col("tm_position").isNotNull(), normalize_text_udf(array_join(col("tm_position"), ", "))).otherwise(normalize_text_udf(col("ts_strPosition"))).alias("position"),
 
         when(col("tm_club").isNotNull(), col("tm_club")[2]).otherwise(lit("ts_idTeam")).alias("clubId"),
         when(col("tm_club").isNotNull(), normalize_text_udf(col("tm_club")[4]))
