@@ -241,7 +241,17 @@ def normalize_date(value):
 
     return f"{day.zfill(2)}-{month.zfill(2)}-{year}"
 
+def normalize_position(arr):
+    if not arr:
+        return None
+    parts = []
+    for item in arr:
+        clean = re.sub(r'[\[\]"\'\\]', '', str(item)).strip()
+        if clean:
+            parts.append(clean)
+    return ", ".join(parts)
 
+normalize_position_udf = udf(normalize_position, StringType())
 normalize_text_udf     = udf(normalize_text, StringType())
 normalize_height_udf   = udf(normalize_height, FloatType())
 normalize_weight_udf   = udf(normalize_weight, FloatType())

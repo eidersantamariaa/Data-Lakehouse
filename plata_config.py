@@ -1,5 +1,5 @@
 from pyspark.sql.functions import col, when, trim, regexp_replace, concat_ws, array_join, concat, lit
-from limpieza import clean_basic, normalize_text_udf, normalize_date_udf, normalize_height_udf, normalize_weight_udf, normalize_currency_udf
+from limpieza import clean_basic, normalize_text_udf, normalize_date_udf, normalize_height_udf, normalize_weight_udf, normalize_currency_udf, normalize_position_udf
 
 NAMESPACE = "mapping"
 
@@ -18,7 +18,7 @@ SILVER_TRANSFORMS = {
         normalize_text_udf(normalize_weight_udf(col("ts_strWeight"))).alias("weight (kg)"),
         when(col("tm_citizenship").isNotNull(), normalize_text_udf(array_join(col("tm_citizenship"), ", "))).otherwise(normalize_text_udf(col("ts_strNationality"))).alias("citizenship"),
         when(col("tm_placeOfBirth").isNotNull(), normalize_text_udf(array_join(col("tm_placeOfBirth"), ", "))).otherwise(normalize_text_udf(col("ts_strBirthLocation"))).alias("placeOfBirth"),
-        when(col("tm_position").isNotNull(), normalize_text_udf(array_join(col("tm_position"), ", "))).otherwise(normalize_text_udf(col("ts_strPosition"))).alias("position"),
+        when(col("tm_position").isNotNull(), normalize_text_udf(normalize_position_udf(array_join(col("tm_position"), ", ")))).otherwise(normalize_text_udf(col("ts_strPosition"))).alias("position"),
 
         when(col("tm_club").isNotNull(), col("tm_club")[2]).otherwise(col("ts_idTeam")).alias("clubId"),
         when(col("tm_club").isNotNull(), normalize_text_udf(col("tm_club")[4]))
