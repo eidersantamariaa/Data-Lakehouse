@@ -18,9 +18,20 @@ SILVER_TRANSFORMS = {
         col("tm_isRetired").cast("boolean").alias("isRetired"),
         normalize_text_udf(array_join(col("tm_citizenship"), ", ")).alias("citizenship"),
 
-        normalize_text_udf(array_join(col("tm_placeOfBirth"), ", ")).alias("placeOfBirth"),
+        normalize_text_udf(when(
+            col("tm_placeOfBirth").getItem("city").isNotNull() & col("tm_placeOfBirth").getItem("country").isNotNull(),
+            concat(col("tm_placeOfBirth").getItem("city"), lit(", "), col("tm_placeOfBirth").getItem("country"))
+        ).when(
+            col("tm_placeOfBirth").getItem("country").isNull(),
+            col("tm_placeOfBirth").getItem("city")
+        ).otherwise(
+            col("tm_placeOfBirth").getItem("country")
+        )).alias("placeOfBirth"),
 
-        normalize_text_udf(array_join(col("tm_position"), ", ")).alias("position"),
+        normalize_text_udf(trim(regexp_replace(
+            concat_ws(", ", col("tm_position").getItem("main"), array_join(col("tm_position").getItem("other"), ", ")),
+            ",\\s*$", ""
+        ))).alias("positions"),
 
         col("tm_club").getItem("id").alias("clubId"),
         normalize_text_udf(col("tm_club").getItem("name")).alias("clubName"),
