@@ -3,6 +3,7 @@ from pyspark.sql.types import StringType, FloatType
 from ingesta import get_spark
 import re
 import unicodedata
+import json
 
 def clean_basic(df, primary_key=None):
     # Si no se pasa primary_key, busca automáticamente
@@ -244,12 +245,22 @@ def normalize_date(value):
 def normalize_position(arr):
     if not arr:
         return None
+    
     parts = []
-    for item in arr:
-        clean = re.sub(r'[\[\]"\'\\]', '', str(item)).strip()
-        if clean:
-            parts.append(clean)
-    return ", ".join(parts)
+    
+    # Primer elemento: posición principal
+    if arr[0]:
+        parts.append(arr[0].strip())
+    
+    # Segundo elemento: array serializado como string
+    if len(arr) > 1 and arr[1]:
+        try:
+            others = json.loads(arr[1])  # parsea '["Central Midfield"]'
+            parts.extend([o.strip() for o in others if o])
+        except (json.JSONDecodeError, TypeError):
+            pass
+    
+    return ", ".join(parts) if parts else None
 
 normalize_position_udf = udf(normalize_position, StringType())
 normalize_text_udf     = udf(normalize_text, StringType())
