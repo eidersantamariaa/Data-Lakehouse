@@ -3,7 +3,6 @@ from pyspark.sql.types import StringType, FloatType
 from ingesta import get_spark
 import re
 import unicodedata
-import json
 
 def clean_basic(df, primary_key=None):
     # Si no se pasa primary_key, busca automáticamente
@@ -244,33 +243,43 @@ def normalize_date(value):
 def normalize_position(val):
     if not val:
         return None
-    
-    # Recibe string tipo: "[Defensive Midfield, ["Central Midfield"]]"
-    val = val.strip()[1:-1]  # quita los corchetes externos
-    
+
+    # Recibe string tipo: "[Defensive Midfield, [\"Central Midfield\"]]"
+    text = str(val).strip()
+    if text.startswith("[") and text.endswith("]"):
+        text = text[1:-1].strip()
+
     # Encuentra la primera coma fuera de corchetes internos
     depth = 0
     split_idx = -1
-    for i, c in enumerate(val):
+    for i, c in enumerate(text):
         if c == '[': depth += 1
         elif c == ']': depth -= 1
         elif c == ',' and depth == 0:
             split_idx = i
             break
-    
+
+    def _clean_piece(piece):
+        piece = piece.strip().strip("[]").strip().strip('"\'')
+        return piece.lower() if piece else ""
+
     if split_idx == -1:
-        return val.strip()
-    
-    main = val[:split_idx].strip()
-    others_str = val[split_idx+1:].strip()
-    
+        single = _clean_piece(text)
+        return single if single else None
+
+    main = _clean_piece(text[:split_idx])
+    others_str = text[split_idx + 1:].strip()
+
+    # Permite entrada como ["Central Midfield", "Attacking Midfield"]
+    if others_str.startswith("[") and others_str.endswith("]"):
+        others_str = others_str[1:-1]
+
     parts = [main] if main else []
-    try:
-        others = json.loads(others_str)
-        parts.extend([o.strip() for o in others if o])
-    except (json.JSONDecodeError, TypeError):
-        pass
-    
+    for raw in others_str.split(","):
+        alt = _clean_piece(raw)
+        if alt:
+            parts.append(alt)
+
     return ", ".join(parts) if parts else None
 
 normalize_position_udf = udf(normalize_position, StringType())
