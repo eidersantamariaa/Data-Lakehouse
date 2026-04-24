@@ -1,4 +1,4 @@
-from pyspark.sql.functions import col, when, trim, regexp_replace, concat_ws, array_join, concat, lit
+from pyspark.sql.functions import col, when, trim, regexp_replace, concat_ws, array_join, concat, lit, round as spark_round
 from limpieza import clean_basic, normalize_text_udf, normalize_date_udf, normalize_height_udf, normalize_weight_udf, normalize_currency_udf, normalize_position_udf
 
 NAMESPACE = "mapping"
@@ -10,7 +10,8 @@ SILVER_TRANSFORMS = {
         when(col("tm_name").isNotNull(), normalize_text_udf(col("tm_name"))).otherwise(normalize_text_udf(col("ts_strPlayer"))).alias("name"),
         when(col("tm_fullName").isNotNull(), normalize_text_udf(col("tm_fullName"))).otherwise(normalize_text_udf(col("ts_strPlayerAlternate"))).alias("fullName"),
         when(col("tm_dateOfBirth").isNotNull(), normalize_date_udf(col("tm_dateOfBirth"))).otherwise(normalize_date_udf(col("ts_dateBorn"))).alias("dateOfBirth"),
-        when(col("tm_height").isNotNull(), normalize_height_udf(col("tm_height"))).otherwise(normalize_height_udf(col("ts_strHeight"))).alias("height"),
+        when(col("tm_height").isNotNull(), spark_round(normalize_height_udf(col("tm_height")), 1))
+            .otherwise(spark_round(normalize_height_udf(col("ts_strHeight")), 1)).alias("height (cm)"),
         when(col("tm_foot").isNotNull(), normalize_text_udf(col("tm_foot"))).otherwise(normalize_text_udf(col("ts_strSide"))).alias("foot"),
         when(col("tm_shirtNumber").isNotNull(), normalize_text_udf(col("tm_shirtNumber"))).otherwise(normalize_text_udf(col("ts_strNumber"))).alias("Number"),
         normalize_text_udf(normalize_currency_udf(col("tm_marketValue"))).alias("marketValue (€)"),
