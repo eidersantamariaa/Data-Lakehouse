@@ -22,9 +22,9 @@ SILVER_TRANSFORMS = {
 
         normalize_text_udf(array_join(col("tm_position"), ", ")).alias("position"),
 
-        col("tm_club.id").alias("clubId"),
-        normalize_text_udf(col("tm_club.name")).alias("clubName"),
-        normalize_date_udf(col("tm_club.joined")).alias("clubJoined"),
-        normalize_date_udf(col("tm_club.contractExpires")).alias("contractExpires"),
+        col("tm_club")[2].alias("clubId"),
+        normalize_text_udf(col("tm_club")[4]).alias("clubName"),
+        normalize_date_udf(col("tm_club")[3]).alias("clubJoined"),
+        normalize_date_udf(col("tm_club")[0]).alias("contractExpires"),
     ).fillna("")
 }
