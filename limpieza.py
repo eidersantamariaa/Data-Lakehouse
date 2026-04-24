@@ -39,7 +39,6 @@ def run_silver(config):
 
         print(f"Transforming {table_name} Bronze → Silver...")
         df_bronze = spark.table(bronze_table)
-        df_bronze.select("tm_position").show(5, truncate=False)
         df_silver = transform_fn(df_bronze)
         df_silver.writeTo(silver_table).createOrReplace()
         print(f"✅ {silver_table}: {df_silver.count()} rows")
@@ -242,23 +241,35 @@ def normalize_date(value):
 
     return f"{day.zfill(2)}-{month.zfill(2)}-{year}"
 
-def normalize_position(arr):
-    if not arr:
+def normalize_position(val):
+    if not val:
         return None
     
-    parts = []
+    # Recibe string tipo: "[Defensive Midfield, ["Central Midfield"]]"
+    val = val.strip()[1:-1]  # quita los corchetes externos
     
-    # Primer elemento: posición principal
-    if arr[0]:
-        parts.append(arr[0].strip())
+    # Encuentra la primera coma fuera de corchetes internos
+    depth = 0
+    split_idx = -1
+    for i, c in enumerate(val):
+        if c == '[': depth += 1
+        elif c == ']': depth -= 1
+        elif c == ',' and depth == 0:
+            split_idx = i
+            break
     
-    # Segundo elemento: array serializado como string
-    if len(arr) > 1 and arr[1]:
-        try:
-            others = json.loads(arr[1])  # parsea '["Central Midfield"]'
-            parts.extend([o.strip() for o in others if o])
-        except (json.JSONDecodeError, TypeError):
-            pass
+    if split_idx == -1:
+        return val.strip()
+    
+    main = val[:split_idx].strip()
+    others_str = val[split_idx+1:].strip()
+    
+    parts = [main] if main else []
+    try:
+        others = json.loads(others_str)
+        parts.extend([o.strip() for o in others if o])
+    except (json.JSONDecodeError, TypeError):
+        pass
     
     return ", ".join(parts) if parts else None
 
