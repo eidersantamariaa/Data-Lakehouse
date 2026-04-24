@@ -35,6 +35,7 @@ def run_silver(config):
 
         print(f"Transforming {table_name} Bronze → Silver...")
         df_bronze = spark.table(bronze_table)
+        df_bronze.select("tm_club").printSchema()
         df_silver = transform_fn(df_bronze)
         df_silver.writeTo(silver_table).createOrReplace()
         print(f"✅ {silver_table}: {df_silver.count()} rows")
