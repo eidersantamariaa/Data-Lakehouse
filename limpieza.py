@@ -76,9 +76,9 @@ def normalize_height(value):
     if re.fullmatch(r"\d+\.?\d*", v.strip()):
         n = float(re.findall(r"\d+\.?\d*", v)[0])
         if n >= 100:      # ya está en cm (ej: 179, 180)
-            return n
+            return round(n, 1)
         else:             # está en metros (ej: 1.79, 1.80)
-            return n * 100
+            return round(n * 100, 1)
     return None
 """
 test_cases = [

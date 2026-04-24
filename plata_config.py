@@ -9,7 +9,7 @@ SILVER_TRANSFORMS = {
         col("id_thesportsdb"),
         when(col("tm_name").isNotNull(), normalize_text_udf(col("tm_name"))).otherwise(normalize_text_udf(col("ts_strPlayer"))).alias("name"),
         when(col("tm_fullName").isNotNull(), normalize_text_udf(col("tm_fullName"))).otherwise(normalize_text_udf(col("ts_strPlayerAlternate"))).alias("fullName"),
-        when(col("tm_dateOfBirth").isNotNull(), normalize_text_udf(col("tm_dateOfBirth"))).otherwise(normalize_text_udf(col("ts_dateBorn"))).alias("dateOfBirth"),
+        when(col("tm_dateOfBirth").isNotNull(), normalize_date_udf(col("tm_dateOfBirth"))).otherwise(normalize_date_udf(col("ts_dateBorn"))).alias("dateOfBirth"),
         when(col("tm_height").isNotNull(), normalize_height_udf(col("tm_height"))).otherwise(normalize_height_udf(col("ts_strHeight"))).alias("height"),
         when(col("tm_foot").isNotNull(), normalize_text_udf(col("tm_foot"))).otherwise(normalize_text_udf(col("ts_strSide"))).alias("foot"),
         when(col("tm_shirtNumber").isNotNull(), normalize_text_udf(col("tm_shirtNumber"))).otherwise(normalize_text_udf(col("ts_strNumber"))).alias("Number"),
