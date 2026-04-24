@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from pyspark.sql.functions import col, trim, udf, coalesce
 from pyspark.sql.types import StringType, FloatType
 from ingesta import get_spark
@@ -68,17 +70,17 @@ def normalize_height(value):
         inch = re.findall(r"(\d+)\s*in", v)
         ft = float(ft[0]) if ft else 0
         inch = float(inch[0]) if inch else 0
-        return float((ft * 30.48) + (inch * 2.54))
+        return Decimal((ft * 30.48) + (inch * 2.54))
     
     if "m" in v:
-        return float(float(re.findall(r"\d+\.?\d*", v)[0]) * 100)
+        return Decimal(float(re.findall(r"\d+\.?\d*", v)[0]) * 100)
     
     if re.fullmatch(r"\d+\.?\d*", v.strip()):
         n = float(re.findall(r"\d+\.?\d*", v)[0])
         if n >= 100:      # ya está en cm (ej: 179, 180)
-            return float(n)
+            return Decimal(n)
         else:             # está en metros (ej: 1.79, 1.80)
-            return float(n * 100)
+            return Decimal(n * 100)
     return None
 """
 test_cases = [
