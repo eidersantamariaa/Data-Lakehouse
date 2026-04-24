@@ -19,22 +19,23 @@ SILVER_TRANSFORMS = {
         normalize_text_udf(array_join(col("tm_citizenship"), ", ")).alias("citizenship"),
 
         normalize_text_udf(when(
-            col("tm_placeOfBirth").getField("city").isNotNull() & col("tm_placeOfBirth").getField("country").isNotNull(),
-            concat(col("tm_placeOfBirth").getField("city"), lit(", "), col("tm_placeOfBirth").getField("country"))
-        ).when(col("tm_placeOfBirth").getField("country").isNull(),
-            col("tm_placeOfBirth").getField("city")
+            col("tm_placeOfBirth").getItem("city").isNotNull() & col("tm_placeOfBirth").getItem("country").isNotNull(),
+            concat(col("tm_placeOfBirth").getItem("city"), lit(", "), col("tm_placeOfBirth").getItem("country"))
+        ).when(
+            col("tm_placeOfBirth").getItem("country").isNull(),
+            col("tm_placeOfBirth").getItem("city")
         ).otherwise(
-            col("tm_placeOfBirth").getField("country")
+            col("tm_placeOfBirth").getItem("country")
         )).alias("placeOfBirth"),
 
         normalize_text_udf(trim(regexp_replace(
-            concat_ws(", ", col("tm_position").getField("main"), array_join(col("tm_position").getField("other"), ", ")),
+            concat_ws(", ", col("tm_position").getItem("main"), array_join(col("tm_position").getItem("other"), ", ")),
             ",\\s*$", ""
         ))).alias("positions"),
 
-        col("tm_club").getField("id").alias("clubId"),
-        normalize_text_udf(col("tm_club").getField("name")).alias("clubName"),
-        normalize_date_udf(col("tm_club").getField("joined")).alias("clubJoined"),
-        normalize_date_udf(col("tm_club").getField("contractExpires")).alias("contractExpires"),
+        col("tm_club").getItem("id").alias("clubId"),
+        normalize_text_udf(col("tm_club").getItem("name")).alias("clubName"),
+        normalize_date_udf(col("tm_club").getItem("joined")).alias("clubJoined"),
+        normalize_date_udf(col("tm_club").getItem("contractExpires")).alias("contractExpires"),
     ).fillna("")
 }
