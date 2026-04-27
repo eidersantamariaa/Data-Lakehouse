@@ -1,14 +1,19 @@
 #!/usr/bin/env python
 """
-worker.py — proceso independiente para tests de concurrencia sobre Iceberg.
+worker.py — proceso de larga vida.
 
-Uso:
-    python worker.py <worker_id> <operation> <target_filter> <scenario_id>
+Inicializa Spark UNA sola vez y luego espera tareas del notebook.
+Cada tarea llega como fichero JSON, el worker la ejecuta y escribe el resultado.
 
-    worker_id     : identificador numérico (0, 1...)
-    operation     : insert | update | delete | merge | read
-    target_filter : id de fila a tocar
-    scenario_id   : nombre del escenario (barreras independientes por test)
+Protocolo de ficheros:
+  /tmp/worker_{id}_ready          → worker señaliza que Spark está listo
+  /tmp/worker_{id}_task.json      → notebook escribe la tarea
+  /tmp/worker_{id}_result.json    → worker escribe el resultado
+  /tmp/worker_{id}_result_done    → worker señaliza que el resultado está listo
+
+Formato tarea:
+  {"operation": "update", "target": "7", "scenario": "s08_upd_upd", "iteration": 0}
+  {"operation": "stop"}   ← termina el proceso
 """
 
 import sys, time, random, json, os
@@ -16,31 +21,23 @@ from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType
 from datetime import datetime
 
-# ── ARGS ───────────────────────────────────────────────────
-worker_id     = int(sys.argv[1])
-operation     = sys.argv[2]
-target_filter = sys.argv[3]
-scenario_id   = sys.argv[4] if len(sys.argv) > 4 else "default"
+worker_id = int(sys.argv[1])
 
-# ── CONFIG ─────────────────────────────────────────────────
-CATALOG  = "players"
+CATALOG = "players"
 DATABASE = "concurrency_tests"
-TARGET   = f"{CATALOG}.{DATABASE}.concurrent_table"
+TARGET  = f"{CATALOG}.{DATABASE}.concurrent_table"
 
-# Barreras únicas por escenario — evita interferencias entre tests
-BARRIER_READY = f"/tmp/{scenario_id}_worker_{worker_id}_ready"
-BARRIER_GO    = f"/tmp/{scenario_id}_go"
+TASK_FILE   = f"/tmp/worker_{worker_id}_task.json"
+RESULT_FILE = f"/tmp/worker_{worker_id}_result.json"
+RESULT_DONE = f"/tmp/worker_{worker_id}_result_done"
+READY_FILE  = f"/tmp/worker_{worker_id}_ready"
 
-NUM_ITERATIONS = 5
-SLEEP_JITTER   = 0.2   # sin base — máxima presión sobre el catálogo
+def info(msg): print(f"INFO: {msg}", flush=True)
 
-def log(data):      print(json.dumps(data), flush=True)
-def info(msg):      print(f"INFO: {msg}", flush=True)
+# ── SPARK — se inicializa una sola vez ──────────────────────
+info(f"[W{worker_id}] Iniciando SparkSession (solo una vez)...")
 
-# ── SPARK ───────────────────────────────────────────────────
-info(f"[W{worker_id}] Iniciando SparkSession para '{scenario_id}'...")
-
-builder = SparkSession.builder.appName(f"{scenario_id}_w{worker_id}_{operation}")
+builder = SparkSession.builder.appName(f"persistent_worker_{worker_id}")
 builder = builder.config("spark.jars.packages",
     "org.apache.iceberg:iceberg-spark-runtime-4.0_2.13:1.10.1,"
     "org.apache.hadoop:hadoop-aws:3.4.2,"
@@ -49,61 +46,37 @@ builder = builder.config("spark.jars.excludes",
     "org.apache.hadoop:hadoop-client-runtime,org.apache.hadoop:hadoop-client-api")
 builder = builder.config("spark.sql.extensions",
     "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-builder = builder.config("spark.sql.catalog.players",            "org.apache.iceberg.spark.SparkCatalog")
-builder = builder.config("spark.sql.catalog.players.type",       "rest")
-builder = builder.config("spark.sql.catalog.players.uri",        "http://172.16.58.11:32688")
-builder = builder.config("spark.sql.catalog.players.warehouse",  "s3://warehouse/")
-builder = builder.config("spark.sql.catalog.players.io-impl",    "org.apache.iceberg.aws.s3.S3FileIO")
-builder = builder.config("spark.sql.catalog.players.s3.endpoint",           "http://172.16.58.11:31224")
-builder = builder.config("spark.sql.catalog.players.s3.region",             "us-east-1")
-builder = builder.config("spark.sql.catalog.players.s3.path-style-access",  "true")
-builder = builder.config("spark.sql.catalog.players.client.region",         "us-east-1")
-builder = builder.config("spark.hadoop.fs.s3a.endpoint",                    "http://172.16.58.11:31224")
-builder = builder.config("spark.hadoop.fs.s3a.endpoint.region",             "us-east-1")
-builder = builder.config("spark.hadoop.fs.s3a.access.key",                  "GK5f421d5f440758f74b0e0312")
-builder = builder.config("spark.hadoop.fs.s3a.secret.key",                  "409baa63477885db12cd1db0a518748c5e83e971b5e8cf2129fe6c7498de125d")
-builder = builder.config("spark.hadoop.fs.s3a.path.style.access",           "true")
-builder = builder.config("spark.hadoop.fs.s3a.impl",                        "org.apache.hadoop.fs.s3a.S3AFileSystem")
-builder = builder.config("spark.sql.catalog.players.s3.checksum-algorithm",       "NONE")
-builder = builder.config("spark.sql.catalog.players.s3.streaming-upload-enabled", "false")
-builder = builder.config("spark.sql.catalog.players.s3.chunked-encoding-enabled", "false")
-builder = builder.config("spark.sql.catalog.players.s3.payload-signing-enabled",  "true")
-builder = builder.config("spark.sql.catalog.players.s3.http-client-type",         "urlconnection")
-builder = builder.config("spark.executor.extraJavaOptions", "-Daws.requestChecksumCalculation=when_required")
-builder = builder.config("spark.driver.extraJavaOptions",   "-Daws.requestChecksumCalculation=when_required")
-builder = builder.config("spark.sql.catalog.players.s3.access-key-id",     "GK5f421d5f440758f74b0e0312")
-builder = builder.config("spark.sql.catalog.players.s3.secret-access-key", "409baa63477885db12cd1db0a518748c5e83e971b5e8cf2129fe6c7498de125d")
+for k, v in [
+    ("spark.sql.catalog.players",                            "org.apache.iceberg.spark.SparkCatalog"),
+    ("spark.sql.catalog.players.type",                       "rest"),
+    ("spark.sql.catalog.players.uri",                        "http://172.16.58.11:32688"),
+    ("spark.sql.catalog.players.warehouse",                  "s3://warehouse/"),
+    ("spark.sql.catalog.players.io-impl",                    "org.apache.iceberg.aws.s3.S3FileIO"),
+    ("spark.sql.catalog.players.s3.endpoint",                "http://172.16.58.11:31224"),
+    ("spark.sql.catalog.players.s3.region",                  "us-east-1"),
+    ("spark.sql.catalog.players.s3.path-style-access",       "true"),
+    ("spark.sql.catalog.players.client.region",              "us-east-1"),
+    ("spark.hadoop.fs.s3a.endpoint",                         "http://172.16.58.11:31224"),
+    ("spark.hadoop.fs.s3a.endpoint.region",                  "us-east-1"),
+    ("spark.hadoop.fs.s3a.access.key",                       "GK5f421d5f440758f74b0e0312"),
+    ("spark.hadoop.fs.s3a.secret.key",                       "409baa63477885db12cd1db0a518748c5e83e971b5e8cf2129fe6c7498de125d"),
+    ("spark.hadoop.fs.s3a.path.style.access",                "true"),
+    ("spark.hadoop.fs.s3a.impl",                             "org.apache.hadoop.fs.s3a.S3AFileSystem"),
+    ("spark.sql.catalog.players.s3.checksum-algorithm",      "NONE"),
+    ("spark.sql.catalog.players.s3.streaming-upload-enabled","false"),
+    ("spark.sql.catalog.players.s3.chunked-encoding-enabled","false"),
+    ("spark.sql.catalog.players.s3.payload-signing-enabled", "true"),
+    ("spark.sql.catalog.players.s3.http-client-type",        "urlconnection"),
+    ("spark.executor.extraJavaOptions",                      "-Daws.requestChecksumCalculation=when_required"),
+    ("spark.driver.extraJavaOptions",                        "-Daws.requestChecksumCalculation=when_required"),
+    ("spark.sql.catalog.players.s3.access-key-id",          "GK5f421d5f440758f74b0e0312"),
+    ("spark.sql.catalog.players.s3.secret-access-key",      "409baa63477885db12cd1db0a518748c5e83e971b5e8cf2129fe6c7498de125d"),
+]:
+    builder = builder.config(k, v)
 
 spark = builder.getOrCreate()
 spark.sparkContext.setLogLevel("ERROR")
-info(f"[W{worker_id}] SparkSession lista")
-
-# ── BARRERA ─────────────────────────────────────────────────
-info(f"[W{worker_id}] Esperando barrera '{scenario_id}'...")
-open(BARRIER_READY, "w").close()
-t0 = time.time()
-while not os.path.exists(BARRIER_GO):
-    if time.time() - t0 > 180:
-        info(f"[W{worker_id}] ERROR: timeout en barrera"); sys.exit(1)
-    time.sleep(0.02)
-info(f"[W{worker_id}] ¡GO! ({operation}, target={target_filter})")
-
-# ── OPERACIONES ─────────────────────────────────────────────
-spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {CATALOG}.{DATABASE}")
-
-spark.sql(f"""
-    CREATE TABLE IF NOT EXISTS {TARGET} (
-        id     INT,
-        source STRING,
-        value  STRING,
-        ts     TIMESTAMP
-    ) USING iceberg
-    TBLPROPERTIES (
-        'write.merge.mode'         = 'merge-on-read',
-        'commit.retry.num-retries' = '4',
-        'commit.retry.min-wait-ms' = '100'
-    )
-""")
+info(f"[W{worker_id}] SparkSession lista — esperando tareas")
 
 schema = StructType([
     StructField("id",     IntegerType()),
@@ -112,7 +85,30 @@ schema = StructType([
     StructField("ts",     TimestampType()),
 ])
 
-for iteration in range(NUM_ITERATIONS):
+# Señaliza al notebook que está listo
+open(READY_FILE, "w").close()
+
+# ── BUCLE DE TAREAS ─────────────────────────────────────────
+while True:
+    # Espera a que el notebook escriba una tarea
+    while not os.path.exists(TASK_FILE):
+        time.sleep(0.02)
+
+    # Lee y borra la tarea inmediatamente
+    with open(TASK_FILE) as f:
+        task = json.load(f)
+    os.remove(TASK_FILE)
+
+    # Señal de parada
+    if task.get("operation") == "stop":
+        info(f"[W{worker_id}] Stop recibido — cerrando")
+        break
+
+    operation = task["operation"]
+    target    = str(task.get("target", "0"))
+    scenario  = task.get("scenario", "?")
+    iteration = task.get("iteration", 0)
+
     start_ns = time.time_ns()
     status = "ok"
     error  = None
@@ -130,17 +126,17 @@ for iteration in range(NUM_ITERATIONS):
             spark.sql(f"""
                 UPDATE {TARGET}
                 SET value = 'upd_w{worker_id}_i{iteration}', source = 'worker_{worker_id}'
-                WHERE id = {target_filter}
+                WHERE id = {target}
             """)
             rows = 1
 
         elif operation == "delete":
-            spark.sql(f"DELETE FROM {TARGET} WHERE id = {target_filter}")
+            spark.sql(f"DELETE FROM {TARGET} WHERE id = {target}")
             rows = 1
 
         elif operation == "merge":
             spark.createDataFrame(
-                [(int(target_filter), f"worker_{worker_id}", f"merge_w{worker_id}_i{iteration}", datetime.now())],
+                [(int(target), f"worker_{worker_id}", f"merge_w{worker_id}_i{iteration}", datetime.now())],
                 schema
             ).createOrReplaceTempView("merge_source")
             spark.sql(f"""
@@ -159,27 +155,31 @@ for iteration in range(NUM_ITERATIONS):
 
     except Exception as e:
         err_str = str(e)
-        if   "CommitFailedException"  in err_str: status = "commit_conflict"
-        elif "ValidationException"    in err_str: status = "validation_conflict"
-        else:                                      status = "error"
+        if   "CommitFailedException" in err_str: status = "commit_conflict"
+        elif "ValidationException"   in err_str: status = "validation_conflict"
+        else:                                     status = "error"
         error = err_str[:300]
 
     end_ns = time.time_ns()
-    log({
+
+    result = {
         "worker_id"   : worker_id,
         "operation"   : operation,
         "iteration"   : iteration,
-        "target"      : target_filter,
-        "scenario"    : scenario_id,
+        "target"      : target,
+        "scenario"    : scenario,
         "status"      : status,
         "rows"        : rows,
         "duration_ms" : (end_ns - start_ns) / 1_000_000,
         "start_time"  : start_ns / 1e9,
         "end_time"    : end_ns / 1e9,
         "error"       : error,
-    })
+    }
 
-    time.sleep(SLEEP_JITTER * random.random())
+    # Escribe resultado y señaliza que está listo
+    with open(RESULT_FILE, "w") as f:
+        json.dump(result, f)
+    open(RESULT_DONE, "w").close()
 
-info(f"[W{worker_id}] Terminado")
 spark.stop()
+info(f"[W{worker_id}] Proceso terminado")
