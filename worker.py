@@ -35,7 +35,7 @@ READY_FILE  = f"/tmp/worker_{worker_id}_ready"
 def info(msg): print(f"INFO: {msg}", flush=True)
 
 # ── SPARK — se inicializa una sola vez ──────────────────────
-info(f"[W{worker_id}] Iniciando SparkSession (solo una vez)...")
+info(f"[W{worker_id}] Iniciando SparkSession...")
 
 builder = SparkSession.builder.appName(f"persistent_worker_{worker_id}")
 builder = builder.config("spark.jars.packages",
