@@ -6,7 +6,7 @@ import pandas as pd
 spark = get_spark()
 
 def run():
-    fusion = spark.read.table("players.mapping.players_unified")
+    fusion = spark.read.table("players.mapping.players_united")
     api3   = spark.read.table("players.fbref.players")
 
     # Convertir a pandas para el fuzzy matching
