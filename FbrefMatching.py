@@ -52,6 +52,13 @@ def run():
     )
 
     # Guardar
+    # Convertir columnas all-null a string para que Spark pueda inferir el tipo
+    for col in resultado.columns:
+        if resultado[col].isna().all():
+            resultado[col] = resultado[col].astype(str)
+
+    # Limpiar tipos problemáticos
+    resultado = resultado.where(pd.notnull(resultado), None)
     spark_df = spark.createDataFrame(resultado)
     spark_df.writeTo("players.mapping.players_unified_fbref") \
         .using("iceberg") \
