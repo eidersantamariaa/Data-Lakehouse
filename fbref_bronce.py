@@ -275,7 +275,7 @@ def getPlayers():
             """)
 
 def get_data():
-    #getTeams()
+    getTeams()
     getPlayers()
 
 get_data()
