@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 from typing import Any
+import math
 
 log = logging.getLogger("timetraveling")
 
@@ -26,6 +27,8 @@ log = logging.getLogger("timetraveling")
 def _format_value(v: Any) -> Any:
     """Convierte tipos complejos de PyArrow/Python a tipos JSON-serializables."""
     if v is None:
+        return None
+    if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
         return None
     if isinstance(v, (str, int, float, bool)):
         return v

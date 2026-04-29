@@ -7,6 +7,8 @@ from pyiceberg.io.fsspec import FsspecFileIO
 import pyarrow as pa
 import boto3
 from timetraveling import TimeTraveler
+import math
+
 
 app = FastAPI()
 catalog = None
@@ -128,8 +130,10 @@ def preview(table: str):
         for row in raw_rows:
             formatted_row = {}
             for k, v in row.items():
+                if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+                    formatted_row[k] = None
                 # Convertimos a string lo que no sea un tipo básico
-                if v is not None and not isinstance(v, (str, int, float, bool)):
+                elif v is not None and not isinstance(v, (str, int, float, bool)):
                     formatted_row[k] = str(v)
                 else:
                     formatted_row[k] = v
