@@ -4,44 +4,44 @@ import json
 import math
 from rapidfuzz import process, fuzz
 from ingesta import get_spark
+from funciones_mapeo import extraer_inicial_apellido, generar_clave
 
 spark = get_spark()
 
+# Función para fuentes con fecha completa
+def clave_fecha_completa(nombre, fecha):
+    return generar_clave(nombre, fecha)
 
-def _generar_clave(nombre, fecha_o_anio):
-    """Genera clave normalizada: nombre_sin_espacios + _ + año"""
-    if not nombre:
-        return None
-    nombre_norm = str(nombre).lower().strip().replace(" ", "")
-    anio = str(fecha_o_anio)[:4] if fecha_o_anio else ""
-    return f"{nombre_norm}_{anio}"
-
+# Función para fuentes con solo año
+def clave_solo_anio(nombre, fecha):
+    anio = str(fecha)[:4] if fecha else ""
+    inicial, apellido = extraer_inicial_apellido(nombre)
+    return f"{inicial}{apellido}{anio}"  # → OSancet2000
 
 def generar_mapeo(*fuentes, umbral=85):
     """
     Genera la tabla de mapeo de IDs entre N fuentes.
 
     Cada fuente es una tupla:
-        (df, col_nombre, col_fecha, col_id, prefijo)
+        (df, col_nombre, col_fecha, col_id, prefijo, fn_clave, umbral)
 
     col_id puede ser None si la fuente no tiene ID propio (ej. fbref).
     En ese caso se usa la clave generada como identificador.
 
     Ejemplo:
         generar_mapeo(
-            (df_tm,    "name",      "dateOfBirth", "id",       "tm"),
-            (df_ts,    "strPlayer", "dateBorn",    "idPlayer", "ts"),
-            (df_fbref, "player",    "born",        None,       "fb"),
+            (df_tm,    "name",      "dateOfBirth", "id",       "tm", clave_fecha_completa, 90),
+            (df_ts,    "strPlayer", "dateBorn",    "idPlayer", "ts", clave_fecha_completa, 90),
+            (df_fbref, "player",    "born",        None,       "fb", clave_solo_anio,      75),
         )
     """
     # 1. Generar clave en cada fuente
     dfs_con_clave = []
-    for df, col_nombre, col_fecha, col_id, prefijo in fuentes:
+    for df, col_nombre, col_fecha, col_id, prefijo, fn_clave, umbral in fuentes:
         df = df.copy()
         df['_clave'] = df.apply(
-            lambda r: _generar_clave(r[col_nombre], r[col_fecha]), axis=1
+            lambda r, fn=fn_clave, cn=col_nombre, cf=col_fecha: fn(r[cn], r[cf]), axis=1
         )
-        # Si no tiene ID propio, usamos la clave como ID
         id_col = col_id if col_id else '_clave'
         dfs_con_clave.append((df, id_col, prefijo))
 
@@ -74,7 +74,12 @@ def generar_mapeo(*fuentes, umbral=85):
         mapeo[f'id_{prefijo_other}'] = mapeo[f'_clave_{prefijo_other}'].map(lookup)
         mapeo = mapeo.drop(columns=[f'_clave_{prefijo_other}'])
 
-    mapeo = mapeo.drop(columns=['_clave'])
+    # ✅ Esto la convierte en id_propio
+    mapeo = mapeo.rename(columns={'_clave': 'id_propio'})
+
+    # Ponerla primera
+    cols = ['id_propio'] + [c for c in mapeo.columns if c != 'id_propio']
+    mapeo = mapeo[cols]
 
     # Resumen
     total = len(mapeo)
@@ -127,6 +132,12 @@ def unir_fuentes(mapeo, *fuentes):
         n = resultado[f"id_{prefijo}"].notna().sum()
         print(f"  Con datos de {prefijo}: {n} ({100*n/total:.1f}%)")
 
+    # Eliminar ids de cada API y renombrar id_propio a id
+    cols_ids_apis = [c for c in resultado.columns if c.startswith("id_") and c != "id_propio"]
+    resultado = resultado.drop(columns=cols_ids_apis)
+    resultado = resultado.rename(columns={"id_propio": "id"})
+    resultado = resultado[["id"] + [c for c in resultado.columns if c != "id"]]
+
     # Serializar a Spark
     def limpiar(v):
         if isinstance(v, float) and math.isnan(v): return None
@@ -140,3 +151,42 @@ def unir_fuentes(mapeo, *fuentes):
     ]
 
     return spark.read.json(spark.sparkContext.parallelize(filas_json))
+
+df_tm = spark.table("players.transfermarkt.players_bronce").toPandas()
+df_ts = spark.table("players.thesportsdb.players_bronce").toPandas()
+df_fbref = spark.table("players.fbref.players").toPandas()
+
+# Paso 1: generar mapeo
+mapeo = generar_mapeo(
+    (df_tm,    "name",      "dateOfBirth", "id",       "tm", clave_fecha_completa, 88),
+    (df_ts,    "strPlayer", "dateBorn",    "idPlayer", "ts", clave_fecha_completa, 88),
+    (df_fbref, "player",    "born",        None,       "fb", clave_solo_anio,      75),  # umbral más bajo
+)
+
+# Paso 2: guardar mapeo
+spark.createDataFrame(mapeo) \
+    .writeTo("players.mapping.players_mapping") \
+    .using("iceberg").createOrReplace()
+
+df_fbref['_clave'] = df_fbref.apply(
+    lambda r: clave_solo_anio(r['player'], r['born']), axis=1
+)
+
+# Paso 3: unir datos
+tabla_final = unir_fuentes(
+    mapeo,
+    (df_tm,    "id",       "tm"),
+    (df_ts,    "idPlayer", "ts"),
+    (df_fbref, "_clave",   "fb"),
+)
+
+# Paso 4: guardar tabla final
+tabla_final.writeTo("players.mapping.players_unified") \
+    .using("iceberg").createOrReplace()
+
+print("Mapeo:       ", len(mapeo))
+print("Tabla final: ", tabla_final.count())
+print("Filas tm:    ", len(df_tm))
+
+print("Con match fbref: ", mapeo['id_fb'].notna().sum())
+print("Sin match fbref: ", mapeo['id_fb'].isna().sum())

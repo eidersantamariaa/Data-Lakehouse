@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from pyspark.sql.functions import col, trim, udf, coalesce
 from pyspark.sql.types import StringType, FloatType
 from ingesta import get_spark
@@ -63,24 +61,24 @@ def normalize_height(value):
     v = v.replace("'", "ft")
     v = v.replace("\"", "in")
     if "cm" in v:
-        return float(re.findall(r"\d+\.?\d*", v)[0])
+        return round(float(re.findall(r"\d+\.?\d*", v)[0]), 2)
     
     if "ft" in v:
         ft = re.findall(r"(\d+)\s*ft", v)
         inch = re.findall(r"(\d+)\s*in", v)
         ft = float(ft[0]) if ft else 0
         inch = float(inch[0]) if inch else 0
-        return Decimal((ft * 30.48) + (inch * 2.54))
+        return round(float((ft * 30.48) + (inch * 2.54)), 2  )
     
     if "m" in v:
-        return Decimal(float(re.findall(r"\d+\.?\d*", v)[0]) * 100)
+        return round(float(float(re.findall(r"\d+\.?\d*", v)[0]) * 100), 2)
     
     if re.fullmatch(r"\d+\.?\d*", v.strip()):
         n = float(re.findall(r"\d+\.?\d*", v)[0])
         if n >= 100:      # ya está en cm (ej: 179, 180)
-            return Decimal(n)
+            return round(float(n), 2)
         else:             # está en metros (ej: 1.79, 1.80)
-            return Decimal(n * 100)
+            return round(float(n * 100), 2)
     return None
 """
 test_cases = [
@@ -88,12 +86,12 @@ test_cases = [
     ("1.82 m (6 ft 0 in)",   "metros con pies al lado"),
     ("1.75m",                 "metros sin espacio"),
     ("175 cm",                "centímetros entero"),
-    ("175.5 cm",              "centímetros decimal"),
+    ("175.5 cm",              "centímetros Float"),
     ("6 ft 2 in",             "pies y pulgadas"),
     ("6 ft",                  "solo pies"),
     ("6'2\"",                "formato anglosajón con comillas"),
     ("196",                   "número limpio entero"),
-    ("1.96",                  "número limpio decimal"),
+    ("1.96",                  "número limpio Float"),
     ("1,82 m",                "metros con coma"),
     ("180CM",                 "cm en mayúsculas"),
     ("2 m",                   "metros entero"),
@@ -168,7 +166,7 @@ def normalize_currency(value):
     has_dot   = "." in s
 
     if has_comma and has_dot:
-        # el último separador es el decimal
+        # el último separador es el Float
         # 1,000.50 → quita comas   |   1.000,50 → quita puntos y coma→punto
         if s.rfind(".") > s.rfind(","):
             s = s.replace(",", "")           # 1,000.50 → 1000.50
@@ -180,7 +178,7 @@ def normalize_currency(value):
         if len(after_comma) == 3:
             s = s.replace(",", "")           # 1,000 → 1000 (miles)
         else:
-            s = s.replace(",", ".")          # 1,5 → 1.5 (decimal)
+            s = s.replace(",", ".")          # 1,5 → 1.5 (Float)
 
     elif has_dot:
         after_comma = s.split(".")[-1]
