@@ -273,6 +273,30 @@ COLUMNAS_NORMALIZAR = [
 ]
 
 
+def _es_nulo(v):
+    """Evalua nulos sin romper cuando el valor es array/lista."""
+    if v is None:
+        return True
+    if isinstance(v, (list, tuple, dict, set)):
+        return False
+    try:
+        na = pd.isna(v)
+        return bool(na) if isinstance(na, (bool,)) else False
+    except Exception:
+        return False
+
+
+def _clave_voto(v):
+    """Convierte valores complejos en claves hashables para el conteo."""
+    if isinstance(v, dict):
+        return tuple(sorted((k, _clave_voto(val)) for k, val in v.items()))
+    if isinstance(v, (list, tuple, set)):
+        return tuple(_clave_voto(x) for x in v)
+    if hasattr(v, "tolist"):
+        return _clave_voto(v.tolist())
+    return v
+
+
 def _votar(valores_norm):
     """
     Recibe dict {col: valor_normalizado}.
@@ -280,13 +304,17 @@ def _votar(valores_norm):
     Si todas difieren devuelve None (el caller pone el tiebreaker).
     """
     conteo = {}
+    originales = {}
     for v in valores_norm.values():
-        if v is None:
+        if _es_nulo(v):
             continue
-        conteo[v] = conteo.get(v, 0) + 1
+        clave = _clave_voto(v)
+        conteo[clave] = conteo.get(clave, 0) + 1
+        if clave not in originales:
+            originales[clave] = v
 
-    mayoria = [v for v, n in conteo.items() if n >= 2]
-    return mayoria[0] if mayoria else None
+    mayoria = [k for k, n in conteo.items() if n >= 2]
+    return originales[mayoria[0]] if mayoria else None
 
 def validar_tabla(df, validaciones=VALIDACIONES):
     global errores_log
@@ -345,7 +373,7 @@ def limpiar_tabla(df, config=COLUMNAS_CONFIG, config_norm=COLUMNAS_NORMALIZAR):
             valores_norm = {}
             for col in fuentes:
                 v = row.get(col)
-                if v is not None and v == v:  # filtrar None y NaN
+                if not _es_nulo(v):
                     try:
                         valores_norm[col] = normalizar(v)
                     except:
@@ -370,7 +398,7 @@ def limpiar_tabla(df, config=COLUMNAS_CONFIG, config_norm=COLUMNAS_NORMALIZAR):
         if col not in df.columns:
             continue
         normalizar = entrada["normalizar"]
-        df[col] = df[col].apply(lambda v: normalizar(v) if v is not None and v == v else None)
+        df[col] = df[col].apply(lambda v: normalizar(v) if not _es_nulo(v) else None)
 
     # Paso 3: aplanar columnas que son listas
     def aplanar_lista(v):
@@ -380,7 +408,7 @@ def limpiar_tabla(df, config=COLUMNAS_CONFIG, config_norm=COLUMNAS_NORMALIZAR):
 
     for col in df.columns:
         if df[col].dropna().apply(lambda x: isinstance(x, list)).any():
-            df[col] = df[col].apply(lambda v: aplanar_lista(v) if v is not None and v == v else None)
+            df[col] = df[col].apply(lambda v: aplanar_lista(v) if not _es_nulo(v) else None)
 
     # Reordenar: ids + cols consolidadas + resto
     cols_ids = [c for c in df.columns if c == "id"]

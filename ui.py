@@ -363,7 +363,7 @@ async def apply_merges(table: str, req: Request):
             for e in body["config"]
         ]
 
-        tabla_limpia = limpiar_tabla(df, config=config, config_norm=[])
+        tabla_limpia = limpiar_tabla(df, config=config, config_norm=[], usar_fuzzy=False)
 
         # Guardar en tabla nueva o sobreescribir
         from ingesta import get_spark
