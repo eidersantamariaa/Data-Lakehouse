@@ -317,3 +317,61 @@ def tt_changes(table: str, start_snapshot_id: str, end_snapshot_id: str, limit: 
 async def root():
     with open("ui.html") as f:
         return f.read()
+    
+@app.get("/merge/detect/{table}")
+def detect_merges(table: str, umbral: float = 0.5):
+    """Detecta columnas solapadas en una tabla."""
+    if catalog is None:
+        return JSONResponse({"error": "Catalog not connected"}, status_code=400)
+    try:
+        ns, tbl_name = table.split(".", 1)
+        t = catalog.load_table((ns, tbl_name))
+        df = t.scan().to_arrow().to_pandas()
+
+        from plata import detectar_solapamientos
+        candidatos = detectar_solapamientos(df, umbral)
+
+        # Agrupar pares en grupos
+        return {"candidatos": candidatos.to_dict(orient="records"),
+                "columnas": df.columns.tolist()}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.post("/merge/apply/{table}")
+async def apply_merges(table: str, req: Request):
+    """Aplica el config de merge y guarda la tabla limpia."""
+    if catalog is None:
+        return JSONResponse({"error": "Catalog not connected"}, status_code=400)
+    try:
+        body = await req.json()
+        # body.config = lista de {col_final, fuentes, tiebreaker}
+        ns, tbl_name = table.split(".", 1)
+        t = catalog.load_table((ns, tbl_name))
+        df = t.scan().to_arrow().to_pandas()
+
+        from plata import limpiar_tabla
+
+        # Construir config sin normalización (el usuario elige las columnas, no las funciones)
+        config = [
+            {
+                "col_final":  e["col_final"],
+                "fuentes":    e["fuentes"],
+                "tiebreaker": e["tiebreaker"],
+                "normalizar": lambda x: x,
+            }
+            for e in body["config"]
+        ]
+
+        tabla_limpia = limpiar_tabla(df, config=config, config_norm=[])
+
+        # Guardar en tabla nueva o sobreescribir
+        from ingesta import get_spark
+        spark = get_spark()
+        spark.createDataFrame(tabla_limpia) \
+            .writeTo(f"{ns}.{tbl_name}_merged") \
+            .using("iceberg").createOrReplace()
+
+        return {"status": "ok", "rows": len(tabla_limpia), "cols": tabla_limpia.columns.tolist()}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
