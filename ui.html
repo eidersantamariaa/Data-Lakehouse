@@ -1000,7 +1000,7 @@
                             <select id="rec-tb-${i}" style="font-size:11px;width:150px">
                                 ${g.columnas.map(c => `<option value="${c}">${c}</option>`).join('')}
                             </select>
-                            <button onclick="addRecomendada(${i}, ${JSON.stringify(g.columnas)})" style="font-size:11px;white-space:nowrap">+ add</button>
+                            <button onclick='addRecomendada(${i}, ${JSON.stringify(g.columnas)})' style="font-size:11px;white-space:nowrap">+ add</button>
                         </div>
                     `).join('');
                 }
