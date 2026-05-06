@@ -1,45 +1,45 @@
 # limpieza.py
 import pandas as pd
 import re
+from datetime import datetime
+from rapidfuzz import fuzz
 
 from limpieza import normalize_text, normalize_date, normalize_height, normalize_weight, normalize_currency, normalize_position
-
-from datetime import datetime
 
 errores_log = []
 
 # ── Detección automática ─────────────────────────────────────────────────────
+def similitud_fuzzy(s1, s2):
+    return fuzz.ratio(str(s1).lower().strip(), str(s2).lower().strip()) / 100
+
 def detectar_solapamientos(df, umbral_similitud=0.7):
-    """
-    Compara columnas de distintas APIs y detecta las que 
-    tienen valores similares en las mismas filas.
-    """
     from itertools import combinations
-    
+
     tm_cols = [c for c in df.columns if c.startswith("tm_")]
     ts_cols = [c for c in df.columns if c.startswith("ts_")]
     fb_cols = [c for c in df.columns if c.startswith("fb_")]
-    
+
     candidatos = []
-    
+
     for col1, col2 in combinations(tm_cols + ts_cols + fb_cols, 2):
-        # Solo comparar columnas de distinta API
         prefix1 = col1.split("_")[0]
         prefix2 = col2.split("_")[0]
         if prefix1 == prefix2:
             continue
-        
-        # Comparar en filas donde ambas tienen valor
+
         ambas = df[[col1, col2]].dropna()
         if len(ambas) < 10:
             continue
-        
-        # Normalizar a string para comparar
+
         try:
             s1 = ambas[col1].astype(str).str.lower().str.strip()
             s2 = ambas[col2].astype(str).str.lower().str.strip()
-            coincidencias = (s1 == s2).mean()
-            if coincidencias >= umbral_similitud:
+
+            # Comparación fuzzy fila a fila
+            scores = [fuzz.ratio(a, b) / 100 for a, b in zip(s1, s2)]
+            coincidencias = sum(s >= umbral_similitud for s in scores) / len(scores)
+
+            if coincidencias >= 0.5:  # al menos 50% de filas son similares
                 candidatos.append({
                     "col1": col1,
                     "col2": col2,
@@ -47,7 +47,7 @@ def detectar_solapamientos(df, umbral_similitud=0.7):
                 })
         except:
             continue
-    
+
     return pd.DataFrame(candidatos).sort_values("coincidencia", ascending=False)
 
 def configurar_solapamientos(df, umbral_similitud=0.5):
