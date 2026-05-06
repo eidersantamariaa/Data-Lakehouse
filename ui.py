@@ -353,6 +353,7 @@ async def apply_merges(table: str, req: Request):
     try:
         body = await req.json()
         # body.config = lista de {col_final, fuentes, tiebreaker}
+        # body.target_table = namespace.table_name (ej: "mapping.players_unified_merged")
         ns, tbl_name = table.split(".", 1)
         t = catalog.load_table((ns, tbl_name))
         df = t.scan().to_arrow().to_pandas()
@@ -372,13 +373,41 @@ async def apply_merges(table: str, req: Request):
 
         tabla_limpia = limpiar_tabla(df, config=config, config_norm=[], usar_fuzzy=False)
 
-        # Guardar en tabla nueva o sobreescribir
-        from ingesta import get_spark
-        spark = get_spark()
-        spark.createDataFrame(tabla_limpia) \
-            .writeTo(f"{ns}.{tbl_name}_merged") \
-            .using("iceberg").createOrReplace()
+        # Obtener nombre de tabla destino del request, o usar default
+        target_table = body.get("target_table", f"{ns}.{tbl_name}_merged")
+        target_ns, target_tbl = target_table.split(".", 1)
 
-        return {"status": "ok", "rows": len(tabla_limpia), "cols": tabla_limpia.columns.tolist()}
+        # Usar PyIceberg para escribir (ya está configurado con el catálogo)
+        arrow_table = pa.Table.from_pandas(tabla_limpia)
+        
+        try:
+            # Intentar crear la tabla si no existe
+            catalog.create_table(
+                (target_ns, target_tbl),
+                schema=arrow_table.schema,
+            )
+            print(f"✅ tabla creada: {target_table}")
+        except Exception as create_err:
+            # Si ya existe, solo la sobrescribimos
+            print(f"⚠ tabla ya existe o error: {create_err}, sobrescribiendo...")
+        
+        # Cargar y sobrescribir la tabla
+        target_t = catalog.load_table((target_ns, target_tbl))
+        target_t.overwrite(arrow_table)
+
+        audit_written = _write_audit_log(
+            namespace=target_ns,
+            table_name=target_tbl,
+            accion="MERGE",
+            num_registros=len(tabla_limpia),
+        )
+
+        return {
+            "status": "ok",
+            "table": target_table,
+            "rows": len(tabla_limpia),
+            "cols": tabla_limpia.columns.tolist(),
+            "audit_logged": audit_written,
+        }
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=400)

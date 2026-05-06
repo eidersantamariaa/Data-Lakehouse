@@ -893,6 +893,10 @@
         // ── Merge tab ──────────────────────────────────────────────────────────────
 
         function renderMergeTab() {
+            // Suggest default target table name
+            const [ns, tbl] = sel.split('.');
+            const suggestedTarget = `${ns}.${tbl}_merged`;
+
             document.getElementById('content').innerHTML = `
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
                     <div>
@@ -949,9 +953,15 @@
                 </div>
 
                 <!-- Apply -->
-                <div style="margin-top:16px;display:flex;align-items:center;gap:8px">
-                    <button class="tt-btn-success" onclick="applyMerges()" id="apply-btn" disabled>apply & save as ${sel}_merged</button>
-                    <button onclick="clearMerge()" style="font-size:11px">clear all</button>
+                <div style="margin-top:16px">
+                    <label class="flabel">save as (namespace.table)</label>
+                    <div style="display:flex;gap:8px;margin-bottom:12px">
+                        <input id="merge-target-table" placeholder="e.g. mapping.players_unified_merged" value="${suggestedTarget}" style="flex:1;font-size:12px">
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <button class="tt-btn-success" onclick="applyMerges()" id="apply-btn" disabled>apply & save</button>
+                        <button onclick="clearMerge()" style="font-size:11px">clear all</button>
+                    </div>
                 </div>
                 <div id="merge-result" class="tt-result"></div>
             `;
@@ -1095,6 +1105,13 @@
 
         async function applyMerges() {
             if (!sel || mergeConfig.length === 0) return;
+
+            const targetTable = document.getElementById('merge-target-table').value.trim();
+            if (!targetTable) {
+                alert('specify a target table (e.g. mapping.players_unified_merged)');
+                return;
+            }
+
             const applyBtn = document.getElementById('apply-btn');
             applyBtn.disabled = true;
             applyBtn.textContent = 'saving…';
@@ -1104,12 +1121,12 @@
                 const r = await fetch(`/merge/apply/${sel}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ config: mergeConfig })
+                    body: JSON.stringify({ config: mergeConfig, target_table: targetTable })
                 });
                 const data = await r.json();
                 if (data.error) throw new Error(data.error);
                 setResult('merge-result', `
-                    <div class="tt-result-hdr"><span class="ok">✓ saved as ${sel}_merged</span></div>
+                    <div class="tt-result-hdr"><span class="ok">✓ saved as ${targetTable}</span></div>
                     <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px">
                         ${data.rows} rows &nbsp;·&nbsp; ${data.cols.length} columns
                         <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">
@@ -1121,7 +1138,7 @@
                 setResult('merge-result', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`);
             } finally {
                 applyBtn.disabled = false;
-                applyBtn.textContent = `apply & save as ${sel}_merged`;
+                applyBtn.textContent = 'apply & save';
             }
         }
 
