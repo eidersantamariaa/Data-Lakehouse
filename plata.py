@@ -347,7 +347,7 @@ def validar_tabla(df, validaciones=VALIDACIONES):
 
     return df, pd.DataFrame(errores_log)
 
-def limpiar_tabla(df, config=COLUMNAS_CONFIG, config_norm=COLUMNAS_NORMALIZAR):
+def limpiar_tabla(df, config=COLUMNAS_CONFIG, config_norm=COLUMNAS_NORMALIZAR, usar_fuzzy=True):
     """
     df: pandas DataFrame con columnas prefijadas (tm_, ts_, fb_...)
     config: lista de dicts con col_final, fuentes, tiebreaker, normalizar
