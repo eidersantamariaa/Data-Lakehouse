@@ -50,6 +50,50 @@ def detectar_solapamientos(df, umbral_similitud=0.7):
 
     return pd.DataFrame(candidatos).sort_values("coincidencia", ascending=False)
 
+def detectar_solapamientos_agrupados(df, umbral_similitud=0.5):
+    """
+    Agrupa los pares solapados en clusters de columnas relacionadas.
+    Ej: si tm_name↔ts_strPlayer y tm_name↔fb_player → grupo [tm_name, ts_strPlayer, fb_player]
+    """
+    candidatos = detectar_solapamientos(df, umbral_similitud)
+    if candidatos.empty:
+        return []
+
+    # Union-Find para agrupar columnas relacionadas
+    parent = {}
+
+    def find(x):
+        parent.setdefault(x, x)
+        if parent[x] != x:
+            parent[x] = find(parent[x])
+        return parent[x]
+
+    def union(x, y):
+        parent[find(x)] = find(y)
+
+    for _, row in candidatos.iterrows():
+        union(row["col1"], row["col2"])
+
+    # Agrupar columnas por cluster
+    grupos = {}
+    for col in set(candidatos["col1"]) | set(candidatos["col2"]):
+        root = find(col)
+        grupos.setdefault(root, set()).add(col)
+
+    # Calcular coincidencia media del grupo
+    resultado = []
+    for cols in grupos.values():
+        cols = list(cols)
+        scores = candidatos[
+            candidatos["col1"].isin(cols) & candidatos["col2"].isin(cols)
+        ]["coincidencia"]
+        resultado.append({
+            "columnas": cols,
+            "coincidencia": round(scores.mean(), 2) if len(scores) else 0
+        })
+
+    return sorted(resultado, key=lambda x: x["coincidencia"], reverse=True)
+
 def configurar_solapamientos(df, umbral_similitud=0.5):
     """
     Detecta solapamientos y pregunta al usuario qué columnas quiere consolidar.

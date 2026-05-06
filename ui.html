@@ -963,7 +963,6 @@
             const btn = document.getElementById('detect-btn');
             btn.disabled = true;
             btn.textContent = 'detecting…';
-            document.getElementById('merge-status').textContent = '';
             document.getElementById('merge-recommended').innerHTML = `<div style="font-size:12px;color:var(--color-text-secondary)"><span class="spinning">◌</span> analyzing columns…</div>`;
 
             try {
@@ -974,9 +973,8 @@
                 allCols = data.columnas;
                 selectedManualCols = new Set();
 
-                // Chips de selección manual
-                const chipsEl = document.getElementById('merge-col-chips');
-                chipsEl.innerHTML = allCols.map(c =>
+                // Chips selección manual
+                document.getElementById('merge-col-chips').innerHTML = allCols.map(c =>
                     `<span class="merge-col-chip" onclick="toggleChip(this,'${c}')">${c}</span>`
                 ).join('');
 
@@ -985,25 +983,24 @@
                 tbSel.innerHTML = `<option value="">— select —</option>` +
                     allCols.map(c => `<option value="${c}">${c}</option>`).join('');
 
-                // Recomendadas
-                document.getElementById('merge-status').textContent = `${data.candidatos.length} overlaps found`;
+                // Recomendadas agrupadas
+                document.getElementById('merge-status').textContent = `${data.grupos.length} groups found`;
                 const rec = document.getElementById('merge-recommended');
-                if (data.candidatos.length === 0) {
+
+                if (data.grupos.length === 0) {
                     rec.innerHTML = `<div class="merge-empty">no overlaps found — try a lower threshold</div>`;
                 } else {
-                    rec.innerHTML = data.candidatos.map((c, i) => `
+                    rec.innerHTML = data.grupos.map((g, i) => `
                         <div class="merge-candidate">
                             <div class="merge-candidate-cols">
-                                <div class="merge-candidate-col"><b>${c.col1}</b></div>
-                                <div class="merge-candidate-col"><b>${c.col2}</b></div>
+                                ${g.columnas.map(c => `<div class="merge-candidate-col"><b>${c}</b></div>`).join('')}
                             </div>
-                            <span class="badge t-num">${Math.round(c.coincidencia * 100)}%</span>
+                            <span class="badge t-num">${Math.round(g.coincidencia * 100)}%</span>
                             <input id="rec-name-${i}" placeholder="column name" style="width:130px;font-size:11px">
                             <select id="rec-tb-${i}" style="font-size:11px;width:150px">
-                                <option value="${c.col1}">${c.col1}</option>
-                                <option value="${c.col2}">${c.col2}</option>
+                                ${g.columnas.map(c => `<option value="${c}">${c}</option>`).join('')}
                             </select>
-                            <button onclick="addRecomendada(${i},'${esc(c.col1)}','${esc(c.col2)}')" style="font-size:11px;white-space:nowrap">+ add</button>
+                            <button onclick="addRecomendada(${i}, ${JSON.stringify(g.columnas)})" style="font-size:11px;white-space:nowrap">+ add</button>
                         </div>
                     `).join('');
                 }
@@ -1032,11 +1029,11 @@
             tb.innerHTML = `<option value="">— select —</option>` + opts;
         }
 
-        function addRecomendada(i, col1, col2) {
+        function addRecomendada(i, columnas) {
             const name = document.getElementById(`rec-name-${i}`).value.trim();
             const tb = document.getElementById(`rec-tb-${i}`).value;
             if (!name) { alert('write a column name'); return; }
-            addGroup({ col_final: name, fuentes: [col1, col2], tiebreaker: tb });
+            addGroup({ col_final: name, fuentes: columnas, tiebreaker: tb });
         }
 
         function addManualGroup() {

@@ -327,7 +327,6 @@ async def root():
     
 @app.get("/merge/detect/{table}")
 def detect_merges(table: str, umbral: float = 0.5):
-    """Detecta columnas solapadas en una tabla."""
     if catalog is None:
         return JSONResponse({"error": "Catalog not connected"}, status_code=400)
     try:
@@ -335,12 +334,13 @@ def detect_merges(table: str, umbral: float = 0.5):
         t = catalog.load_table((ns, tbl_name))
         df = t.scan().to_arrow().to_pandas()
 
-        from plata import detectar_solapamientos
-        candidatos = detectar_solapamientos(df, umbral)
+        from plata import detectar_solapamientos_agrupados
+        grupos = detectar_solapamientos_agrupados(df, umbral)
 
-        # Agrupar pares en grupos
-        return {"candidatos": candidatos.to_dict(orient="records"),
-                "columnas": df.columns.tolist()}
+        return {
+            "grupos": grupos,       # lista de {columnas: [...], coincidencia: 0.x}
+            "columnas": df.columns.tolist()
+        }
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=400)
 
