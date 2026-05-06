@@ -30,11 +30,17 @@ async def connect_catalog(req: Request):
     global catalog, s3_config, tt
     data = await req.json()
     try:
+        warehouse_prefix = data.get("wp", "").strip().strip("/")
+        warehouse = f"s3://{data['bk'].strip()}"
+        if warehouse_prefix:
+            warehouse = f"{warehouse}/{warehouse_prefix}"
+
         catalog = load_catalog(
             "garage",
             **{
                 "type": "rest",
                 "uri": data["ep"],
+                "warehouse": warehouse,
                 "s3.endpoint": data["ep_s3"],
                 "s3.access-key-id": data["ak"],
                 "s3.secret-access-key": data["sk"],
@@ -45,6 +51,7 @@ async def connect_catalog(req: Request):
         )
         # Guarda los datos de conexión para usarlos en preview
         s3_config = data
+        s3_config["warehouse"] = warehouse
         namespaces = catalog.list_namespaces()
         print("✅ namespaces:", namespaces)
     except Exception as e:

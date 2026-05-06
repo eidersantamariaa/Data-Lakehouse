@@ -400,15 +400,22 @@ def limpiar_tabla(df, config=COLUMNAS_CONFIG, config_norm=COLUMNAS_NORMALIZAR, u
         normalizar = entrada["normalizar"]
         df[col] = df[col].apply(lambda v: normalizar(v) if not _es_nulo(v) else None)
 
-    # Paso 3: aplanar columnas que son listas
-    def aplanar_lista(v):
-        if isinstance(v, list):
+    # Paso 3: aplanar columnas con valores complejos para que Spark pueda inferir tipo
+    def aplanar_valor(v):
+        if isinstance(v, dict):
+            return ", ".join(f"{k}={i}" for k, i in v.items() if i is not None)
+        if isinstance(v, (list, tuple, set)):
             return ", ".join(str(i) for i in v if i is not None)
+        if hasattr(v, "tolist") and not isinstance(v, (str, bytes)):
+            try:
+                return aplanar_valor(v.tolist())
+            except Exception:
+                return str(v)
         return v
 
     for col in df.columns:
-        if df[col].dropna().apply(lambda x: isinstance(x, list)).any():
-            df[col] = df[col].apply(lambda v: aplanar_lista(v) if not _es_nulo(v) else None)
+        if df[col].dropna().apply(lambda x: isinstance(x, (list, tuple, set, dict)) or (hasattr(x, "tolist") and not isinstance(x, (str, bytes)))).any():
+            df[col] = df[col].apply(lambda v: aplanar_valor(v) if not _es_nulo(v) else None)
 
     # Reordenar: ids + cols consolidadas + resto
     cols_ids = [c for c in df.columns if c == "id"]
