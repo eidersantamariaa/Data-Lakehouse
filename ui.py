@@ -15,16 +15,6 @@ catalog = None
 s3_config = {}
 tt: TimeTraveler | None = None
 
-"""
-pip install pyarrow pyiceberg boto3 fastapi uvicorn
-
-endpoint=http://172.16.58.11:32688
-access_key=GK5f421d5f440758f74b0e0312
-secret_key=409baa63477885db12cd1db0a518748c5e83e971b5e8cf2129fe6c7498de125d
-bucket=warehouse
-
-"""
-
 @app.post("/connect")
 async def connect_catalog(req: Request):
     global catalog, s3_config, tt
@@ -49,7 +39,6 @@ async def connect_catalog(req: Request):
                 "py-io-impl": "pyiceberg.io.pyarrow.PyArrowFileIO",
             }
         )
-        # Guarda los datos de conexión para usarlos en preview
         s3_config = data
         s3_config["warehouse"] = warehouse
         namespaces = catalog.list_namespaces()
@@ -57,7 +46,7 @@ async def connect_catalog(req: Request):
     except Exception as e:
         print("❌ error:", e)
         return JSONResponse({"status": "error", "msg": str(e)}, status_code=400)
-    
+
     try:
         tt = TimeTraveler(catalog)
         print("✅ tt ok:", tt)
@@ -113,11 +102,12 @@ def schema(table: str):
         "loc": t.location(),
     }
 
+# ── Preview ahora acepta limit como query param ─────────────────────────────
 @app.get("/preview/{table}")
-def preview(table: str):
+def preview(table: str, limit: int = 50):
     if catalog is None:
         return {"error": "Catalog not connected"}
-    
+
     ns, tbl_name = table.split(".", 1)
     t = catalog.load_table((ns, tbl_name))
     snap = t.current_snapshot()
@@ -125,21 +115,14 @@ def preview(table: str):
 
     rows = []
     try:
-        # 1. Escaneamos la tabla y pedimos solo las primeras 5 filas
-        # PyIceberg usa PyArrow internamente para esto.
-        # .limit(5) es eficiente: no descarga toda la tabla.
-        table_scan = t.scan(limit=5).to_arrow()
-        
-        # 2. Convertimos a lista de diccionarios
+        table_scan = t.scan(limit=limit).to_arrow()
         raw_rows = table_scan.to_pylist()
 
-        # 3. Formateamos tipos complejos (igual que tenías antes)
         for row in raw_rows:
             formatted_row = {}
             for k, v in row.items():
                 if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
                     formatted_row[k] = None
-                # Convertimos a string lo que no sea un tipo básico
                 elif v is not None and not isinstance(v, (str, int, float, bool)):
                     formatted_row[k] = str(v)
                 else:
@@ -167,8 +150,6 @@ def snapshots(table: str):
     try:
         ns, tbl_name = table.split(".", 1)
         t = catalog.load_table((ns, tbl_name))
-        # Refresh metadata to ensure we have the latest snapshots
-        # (especially after expire_snapshots was called)
         t.refresh()
         current_id = t.current_snapshot().snapshot_id if t.current_snapshot() else None
         snaps = []
@@ -177,7 +158,7 @@ def snapshots(table: str):
             from datetime import datetime
             ts = datetime.fromtimestamp(s.timestamp_ms / 1000).strftime("%Y-%m-%d %H:%M")
             snaps.append({
-                "id": str(s.snapshot_id),  # Convert to string to preserve precision
+                "id": str(s.snapshot_id),
                 "ts": ts,
                 "op": sm.get("operation", "—"),
                 "add": sm.get("added-data-files", "0"),
@@ -197,14 +178,11 @@ def _tt():
 
 
 def _write_audit_log(namespace: str, table_name: str, accion: str, num_registros: int = 0):
-    """Best-effort audit log writer using PyIceberg table append if available."""
     if catalog is None:
         return False
-
     try:
         audit_table = catalog.load_table((namespace, "audit_log"))
     except Exception:
-        # If audit table does not exist, skip silently (best-effort behavior)
         return False
 
     row = {
@@ -217,12 +195,9 @@ def _write_audit_log(namespace: str, table_name: str, accion: str, num_registros
 
     try:
         arrow_tbl = pa.Table.from_pylist([row])
-
-        # PyIceberg versions differ in write APIs; try common entry points.
         if hasattr(audit_table, "append"):
             audit_table.append(arrow_tbl)
         elif hasattr(audit_table, "add_files"):
-            # Not ideal for row writes, but keep fallback for API variance.
             return False
         else:
             return False
@@ -234,22 +209,18 @@ def _write_audit_log(namespace: str, table_name: str, accion: str, num_registros
 
 @app.post("/table/delete/{table}")
 def delete_table(table: str):
-    """Elimina una tabla, registra la accion en audit_log y devuelve el comando ejecutado."""
     if catalog is None:
         return JSONResponse({"error": "Catalog not connected"}, status_code=400)
-
     try:
         ns, tbl_name = table.split(".", 1)
     except ValueError:
         return JSONResponse({"error": "Formato invalido, usa namespace.tabla"}, status_code=400)
 
-    # Command string shown in server logs and returned to UI
     cmd = f"DROP TABLE players.{ns}.{tbl_name} PURGE"
     count = f"SELECT COUNT(*) FROM players.{ns}.{tbl_name}"
     print(f"🗑 executing server command: {cmd}")
 
     try:
-        # Try signatures compatible across pyiceberg versions
         try:
             catalog.drop_table((ns, tbl_name), purge_requested=True)
         except TypeError:
@@ -261,7 +232,7 @@ def delete_table(table: str):
         audit_written = _write_audit_log(
             namespace=ns,
             table_name=tbl_name,
-            accion= "DROP",
+            accion="DROP",
             num_registros=count,
         )
 
@@ -276,55 +247,46 @@ def delete_table(table: str):
 
 @app.get("/tt/read-snapshot/{table}")
 def tt_read_snapshot(table: str, snapshot_id: str, limit: int = 50):
-    """Lee datos de la tabla en un snapshot concreto."""
     try:
         return _tt().read_at_snapshot(table, int(snapshot_id), limit)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=400)
- 
- 
+
 @app.get("/tt/read-timestamp/{table}")
 def tt_read_timestamp(table: str, timestamp_ms: int, limit: int = 50):
-    """Lee datos de la tabla en un momento concreto (ms Unix)."""
     try:
         return _tt().read_at_timestamp(table, timestamp_ms, limit)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=400)
- 
- 
+
 @app.post("/tt/rollback-snapshot/{table}")
 async def tt_rollback_snapshot(table: str, req: Request):
-    """Rollback al snapshot indicado."""
     try:
         body = await req.json()
         return _tt().rollback_to_snapshot(table, int(body["snapshot_id"]))
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=400)
- 
- 
+
 @app.post("/tt/rollback-timestamp/{table}")
 async def tt_rollback_timestamp(table: str, req: Request):
-    """Rollback al snapshot mas cercano anterior al timestamp indicado."""
     try:
         body = await req.json()
         return _tt().rollback_to_timestamp(table, int(body["timestamp_ms"]))
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=400)
- 
- 
+
 @app.get("/tt/changes/{table}")
 def tt_changes(table: str, start_snapshot_id: str, end_snapshot_id: str, limit: int = 200):
-    """Devuelve registros anadidos entre dos snapshots."""
     try:
         return _tt().get_incremental_changes(table, int(start_snapshot_id), int(end_snapshot_id), limit)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=400)
- 
+
 @app.get("/", response_class=HTMLResponse)
 async def root():
     with open("ui.html") as f:
         return f.read()
-    
+
 @app.get("/merge/detect/{table}")
 def detect_merges(table: str, umbral: float = 0.5):
     if catalog is None:
@@ -338,7 +300,7 @@ def detect_merges(table: str, umbral: float = 0.5):
         grupos = detectar_solapamientos_agrupados(df, umbral)
 
         return {
-            "grupos": grupos,       # lista de {columnas: [...], coincidencia: 0.x}
+            "grupos": grupos,
             "columnas": df.columns.tolist()
         }
     except Exception as e:
@@ -347,20 +309,16 @@ def detect_merges(table: str, umbral: float = 0.5):
 
 @app.post("/merge/apply/{table}")
 async def apply_merges(table: str, req: Request):
-    """Aplica el config de merge y guarda la tabla limpia."""
     if catalog is None:
         return JSONResponse({"error": "Catalog not connected"}, status_code=400)
     try:
         body = await req.json()
-        # body.config = lista de {col_final, fuentes, tiebreaker}
-        # body.target_table = namespace.table_name (ej: "mapping.players_unified_merged")
         ns, tbl_name = table.split(".", 1)
         t = catalog.load_table((ns, tbl_name))
         df = t.scan().to_arrow().to_pandas()
 
         from plata import limpiar_tabla
 
-        # Construir config sin normalización (el usuario elige las columnas, no las funciones)
         config = [
             {
                 "col_final":  e["col_final"],
@@ -373,25 +331,20 @@ async def apply_merges(table: str, req: Request):
 
         tabla_limpia = limpiar_tabla(df, config=config, config_norm=[], usar_fuzzy=False)
 
-        # Obtener nombre de tabla destino del request, o usar default
         target_table = body.get("target_table", f"{ns}.{tbl_name}_merged")
         target_ns, target_tbl = target_table.split(".", 1)
 
-        # Usar PyIceberg para escribir (ya está configurado con el catálogo)
         arrow_table = pa.Table.from_pandas(tabla_limpia)
-        
+
         try:
-            # Intentar crear la tabla si no existe
             catalog.create_table(
                 (target_ns, target_tbl),
                 schema=arrow_table.schema,
             )
             print(f"✅ tabla creada: {target_table}")
         except Exception as create_err:
-            # Si ya existe, solo la sobrescribimos
             print(f"⚠ tabla ya existe o error: {create_err}, sobrescribiendo...")
-        
-        # Cargar y sobrescribir la tabla
+
         target_t = catalog.load_table((target_ns, target_tbl))
         target_t.overwrite(arrow_table)
 

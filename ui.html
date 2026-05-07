@@ -407,6 +407,49 @@
             margin-bottom: 10px;
         }
 
+        /* ── Preview column filter chips ── */
+        .prev-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .prev-col-bar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            padding: 8px 10px;
+            background: var(--color-background-secondary);
+            border-radius: var(--border-radius-md);
+            border: 0.5px solid var(--color-border-tertiary);
+        }
+
+        .prev-col-chip {
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            border: 0.5px solid var(--color-border-secondary);
+            background: var(--color-background-primary);
+            cursor: pointer;
+            color: var(--color-text-secondary);
+            transition: all .12s;
+            user-select: none;
+        }
+
+        .prev-col-chip:hover {
+            color: var(--color-text-primary);
+        }
+
+        .prev-col-chip.on {
+            background: rgba(29, 158, 117, .12);
+            border-color: rgba(29, 158, 117, .45);
+            color: #1D9E75;
+        }
+
         /* ── Time Travel styles ── */
         .tt-modes {
             display: flex;
@@ -777,6 +820,9 @@
         const badge = t => `<span class="badge ${typeClass[t] || 't-str'}">${t}</span>`;
         const esc = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+        // ── Preview state ──────────────────────────────────────────────────────────
+        let prevHiddenCols = new Set(); // columns toggled OFF
+
         // ── Merge state ────────────────────────────────────────────────────────────
         let mergeConfig = [];
         let allCols = [];
@@ -809,12 +855,20 @@
         async function pick(k) {
             sel = k; curTab = 'schema';
             mergeConfig = []; allCols = []; selectedManualCols = new Set();
+            prevHiddenCols = new Set();
             const [schema, preview, snapsData] = await Promise.all([
                 fetch(`/schema/${k}`).then(r => r.json()),
-                fetch(`/preview/${k}`).then(r => r.json()),
+                fetch(`/preview/${k}?limit=50`).then(r => r.json()),
                 fetch(`/snapshots/${k}`).then(r => r.json()),
             ]);
-            T[k] = { ...schema, preview: preview.preview || [], snap: preview.snap || '—', snaps: snapsData.snaps || [] };
+            // preview.schema es la fuente canónica para columnas en preview tab
+            T[k] = {
+                ...schema,
+                previewSchema: preview.schema || schema.schema || [],
+                preview: preview.preview || [],
+                snap: preview.snap || '—',
+                snaps: snapsData.snaps || []
+            };
             document.getElementById('tabs').style.display = 'flex';
             renderSidebar(); renderContent();
         }
@@ -863,15 +917,121 @@
         ${rows}`;
         }
 
+        // ── Preview tab ────────────────────────────────────────────────────────────
+
         function renderData(d) {
-            const cols = d.schema.map(f => f.n);
-            const ths = cols.map(c => `<th>${c}</th>`).join('');
-            const trs = d.preview.map(row => `<tr>${cols.map(c => {
-                const v = row[c]; return v === null ? `<td><span class="null">null</span></td>` : `<td>${esc(v)}</td>`;
-            }).join('')}</tr>`).join('');
-            return `<div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:10px">showing 5 of ${fmt(d.rows)} rows &nbsp;·&nbsp; snapshot ${d.snap}</div>
-        <div style="overflow-x:auto"><table class="dtbl"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
+            // previewSchema = schema devuelto por /preview/, más fiable que /schema/ para esta tab
+            const schema = d.previewSchema || d.schema || [];
+            const cols = schema.map(f => f.n);
+
+            if (cols.length === 0) {
+                return `<div style="font-size:12px;color:var(--color-text-danger);padding:16px 0">
+                    ✗ schema vacío — recarga la página o reconecta al catálogo.
+                </div>`;
+            }
+
+            const chips = cols.map(c => {
+                const safeC = c.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                const isOn = !prevHiddenCols.has(c);
+                return `<span class="prev-col-chip${isOn ? ' on' : ''}" onclick="togglePrevCol(this,'${safeC}')">${esc(c)}</span>`;
+            }).join('');
+
+            return `
+                <div class="prev-toolbar">
+                    <span class="tt-label">limit</span>
+                    <input type="number" id="prev-limit" value="${d.preview.length || 50}" min="1" max="10000" style="width:70px">
+                    <button class="tt-btn-info" onclick="doPreview()">load</button>
+                    <span id="prev-meta" style="font-size:11px;color:var(--color-text-secondary)">
+                        ${d.preview.length} rows shown &nbsp;·&nbsp; ${fmt(d.rows)} total &nbsp;·&nbsp; snap ${d.snap}
+                    </span>
+                </div>
+
+                <div style="margin-bottom:10px">
+                    <div style="font-size:10px;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;display:flex;align-items:center;gap:8px">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                        columns
+                        <button onclick="prevColAll(true)" style="font-size:10px;padding:1px 8px;text-transform:none;letter-spacing:0">all</button>
+                        <button onclick="prevColAll(false)" style="font-size:10px;padding:1px 8px;text-transform:none;letter-spacing:0">none</button>
+                        <span id="prev-col-count" style="color:var(--color-text-secondary);font-size:10px;text-transform:none;letter-spacing:0">${cols.length} / ${cols.length} visible</span>
+                    </div>
+                    <div class="prev-col-bar" id="prev-col-bar">${chips}</div>
+                </div>
+
+                <div id="prev-table-wrap" style="overflow-x:auto">
+                    ${buildPreviewTable(d.preview, cols)}
+                </div>
+            `;
         }
+
+        function buildPreviewTable(rows, cols) {
+            if (!rows || rows.length === 0) {
+                return `<div style="font-size:12px;color:var(--color-text-secondary);padding:12px 0">no rows returned</div>`;
+            }
+            const visibleCols = cols.filter(c => !prevHiddenCols.has(c));
+            if (visibleCols.length === 0) {
+                return `<div style="font-size:12px;color:var(--color-text-secondary);padding:12px 0">no columns selected</div>`;
+            }
+            const ths = visibleCols.map(c => `<th>${esc(c)}</th>`).join('');
+            const trs = rows.map(row => `<tr>${visibleCols.map(c => {
+                const v = row[c];
+                return v === null ? `<td><span class="null">null</span></td>` : `<td>${esc(String(v))}</td>`;
+            }).join('')}</tr>`).join('');
+            return `<table class="dtbl"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>`;
+        }
+
+        function togglePrevCol(el, col) {
+            if (prevHiddenCols.has(col)) {
+                prevHiddenCols.delete(col);
+                el.classList.add('on');
+            } else {
+                prevHiddenCols.add(col);
+                el.classList.remove('on');
+            }
+            // Re-render only the table part (no full re-render, preserves limit input)
+            const d = T[sel];
+            document.getElementById('prev-table-wrap').innerHTML = buildPreviewTable(d.preview, d.schema.map(f => f.n));
+        }
+
+        function prevColAll(on) {
+            if (on) {
+                prevHiddenCols = new Set();
+            } else {
+                prevHiddenCols = new Set(T[sel].schema.map(f => f.n));
+            }
+            // Re-render the whole data tab to update chip states + table
+            document.getElementById('content').innerHTML = renderData(T[sel]);
+        }
+
+        async function doPreview() {
+            if (!sel) return;
+            const limit = parseInt(document.getElementById('prev-limit').value) || 50;
+            const btn = document.querySelector('#content .tt-btn-info');
+            if (btn) { btn.disabled = true; btn.textContent = '…'; }
+
+            try {
+                const r = await fetch(`/preview/${sel}?limit=${limit}`);
+                const data = await r.json();
+                if (data.error) throw new Error(data.error);
+
+                T[sel].preview = data.preview || [];
+                T[sel].snap = data.snap || '—';
+
+                // Update meta line
+                const metaEl = document.getElementById('prev-meta');
+                if (metaEl) metaEl.textContent = `${data.preview.length} rows shown · ${fmt(T[sel].rows)} total · snap ${data.snap}`;
+
+                // Re-render table
+                const cols = T[sel].schema.map(f => f.n);
+                document.getElementById('prev-table-wrap').innerHTML = buildPreviewTable(data.preview || [], cols);
+            } catch (e) {
+                const wrap = document.getElementById('prev-table-wrap');
+                if (wrap) wrap.innerHTML = `<div style="font-size:12px;color:var(--color-text-danger);padding:8px 0">✗ ${esc(e.message)}</div>`;
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = 'load'; }
+            }
+        }
+
+        // ── Snapshots tab ──────────────────────────────────────────────────────────
 
         function renderSnaps(d) {
             return d.snaps.map((s, i) => `
@@ -893,7 +1053,6 @@
         // ── Merge tab ──────────────────────────────────────────────────────────────
 
         function renderMergeTab() {
-            // Suggest default target table name
             const [ns, tbl] = sel.split('.');
             const suggestedTarget = `${ns}.${tbl}_merged`;
 
@@ -912,7 +1071,6 @@
                     <button class="tt-btn-info" onclick="detectMerges()" id="detect-btn">detect overlaps</button>
                 </div>
 
-                <!-- Recomendadas -->
                 <div class="merge-section-title">
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-6 4 2 7-6-4-6 4 2-7-6-4h7z"/></svg>
                     recommended
@@ -922,7 +1080,6 @@
                     <div class="merge-empty">click "detect overlaps" to find candidate columns</div>
                 </div>
 
-                <!-- Manual -->
                 <div class="merge-section-title" style="margin-top:20px">
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
                     manual selection
@@ -942,7 +1099,6 @@
                     <button class="tt-btn-info" onclick="addManualGroup()" style="align-self:end">+ add group</button>
                 </div>
 
-                <!-- Config actual -->
                 <div class="merge-section-title" style="margin-top:20px">
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
                     config
@@ -952,7 +1108,6 @@
                     <div class="merge-empty">no groups yet</div>
                 </div>
 
-                <!-- Apply -->
                 <div style="margin-top:16px">
                     <label class="flabel">save as (namespace.table)</label>
                     <div style="display:flex;gap:8px;margin-bottom:12px">
@@ -983,17 +1138,14 @@
                 allCols = data.columnas;
                 selectedManualCols = new Set();
 
-                // Chips selección manual
                 document.getElementById('merge-col-chips').innerHTML = allCols.map(c =>
                     `<span class="merge-col-chip" onclick="toggleChip(this,'${c}')">${c}</span>`
                 ).join('');
 
-                // Tiebreaker select
                 const tbSel = document.getElementById('merge-manual-tb');
                 tbSel.innerHTML = `<option value="">— select —</option>` +
                     allCols.map(c => `<option value="${c}">${c}</option>`).join('');
 
-                // Recomendadas agrupadas
                 document.getElementById('merge-status').textContent = `${data.grupos.length} groups found`;
                 const rec = document.getElementById('merge-recommended');
 
@@ -1030,7 +1182,6 @@
                 selectedManualCols.add(col);
                 el.classList.add('selected');
             }
-            // Update tiebreaker options to only show selected cols
             const tb = document.getElementById('merge-manual-tb');
             const prev = tb.value;
             const opts = selectedManualCols.size > 0
@@ -1054,14 +1205,12 @@
             if (selected.length < 2) { alert('select at least 2 columns'); return; }
             if (!tb) { alert('select a tiebreaker'); return; }
             addGroup({ col_final: name, fuentes: selected, tiebreaker: tb });
-            // Reset
             document.getElementById('merge-manual-name').value = '';
             selectedManualCols = new Set();
             document.querySelectorAll('.merge-col-chip').forEach(c => c.classList.remove('selected'));
         }
 
         function addGroup(entry) {
-            // Evitar duplicar col_final
             if (mergeConfig.find(g => g.col_final === entry.col_final)) {
                 alert(`A group named "${entry.col_final}" already exists`);
                 return;

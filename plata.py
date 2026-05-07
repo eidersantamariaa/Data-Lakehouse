@@ -190,15 +190,10 @@ def extraer_nombre_equipo(v):
     if not isinstance(v, list):
         return normalize_text(v) if v else None
     
-    for item in v:
-        if item is None:
-            continue
-        # Descartar fechas (YYYY-MM-DD) y números puros
-        if re.match(r'^\d{4}-\d{2}-\d{2}$', str(item)):
-            continue
-        if re.match(r'^\d+$', str(item)):
-            continue
-        return normalize_text(item)
+    # El nombre del equipo suele estar al final, devolver el último elemento no-nulo
+    for item in reversed(v):
+        if item is not None:
+            return normalize_text(item)
     
     return None
 
