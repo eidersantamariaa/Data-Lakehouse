@@ -4,6 +4,36 @@ import pyspark
 from pyspark.errors.exceptions.captured import AnalysisException
 from audit_log import write_audit_log
 
+
+def _resolve_merge_keys(table_name, columns):
+    """Return the best merge key columns for a table."""
+    column_set = set(columns)
+
+    preferred_keys = {
+        "leagues": ["idLeague"],
+        "teams": ["idTeam"],
+        "players": ["idPlayer"],
+    }
+
+    for key in preferred_keys.get(table_name, []):
+        if key in column_set:
+            return [key]
+
+    if "id" in column_set:
+        return ["id"]
+
+    # Fallbacks for tables that are keyed by a natural composite key.
+    if table_name == "teams" and {"season", "team"}.issubset(column_set):
+        return ["season", "team"]
+    if table_name == "players" and {"season", "team", "player"}.issubset(column_set):
+        return ["season", "team", "player"]
+
+    id_like_columns = [col for col in columns if col.lower().startswith("id")]
+    if len(id_like_columns) == 1:
+        return id_like_columns
+
+    return []
+
 def get_spark():
     builder = SparkSession.builder.appName("ingesta")
 
@@ -70,6 +100,7 @@ def run_ingesta(config):
     spark.sql(f"CREATE NAMESPACE IF NOT EXISTS players.{config.NAMESPACE}")
 
     data = config.get_data()
+    processed = []
 
     for table_name, records in data.items():
         print(f"Processing {table_name}... ({len(records)} records)")
@@ -80,11 +111,7 @@ def run_ingesta(config):
         )
 
         # ¿Existe la tabla?
-        try:
-            spark.sql(f"SELECT 1 FROM {full_table} LIMIT 1")
-            table_exists = True
-        except Exception:
-            table_exists = False
+        table_exists = spark.catalog.tableExists(full_table)
 
         if not table_exists:
             # Primera vez: crear directamente
@@ -101,28 +128,53 @@ def run_ingesta(config):
             existing_cols = set(spark.table(full_table).columns)
             new_cols = set(df_new.columns) - existing_cols
 
+            merge_keys = _resolve_merge_keys(table_name, df_new.columns)
+            if not merge_keys:
+                print(f"⚠ No merge key found for {full_table}, appending rows instead of MERGE")
+                df_new.writeTo(full_table).append()
+                accion = "APPEND"
+                write_audit_log(spark, config.NAMESPACE, f"{table_name}_bronce", accion, len(records))
+                print(f"✅ {table_name} procesado ({accion})")
+                print(f"🔧 Compactando {full_table}...")
+                spark.sql(f"""
+                    CALL players.system.rewrite_data_files(
+                        table => '{full_table}',
+                        strategy => 'binpack',
+                        options => map('target-file-size-bytes', '134217728')
+                    )
+                """)
+                print(f"✅ {full_table} compactado")
+                continue
+
             for col in new_cols:
                 col_type = dict(df_new.dtypes)[col]
                 print(f"  ➕ Nueva columna detectada: {col} ({col_type})")
                 spark.sql(f"ALTER TABLE {full_table} ADD COLUMN {col} {col_type}")
                 accion = "ALTER"
 
-            # Upsert: MERGE INTO usando 'id' como clave
+            # Upsert: MERGE INTO usando la clave más adecuada para la tabla
             df_new.createOrReplaceTempView(f"incoming_{table_name}")
 
             update_set = ", ".join(
-                [f"target.{c} = source.{c}" for c in df_new.columns if c != "id"]
+                [f"target.{c} = source.{c}" for c in df_new.columns if c not in merge_keys]
             )
             insert_cols = ", ".join(df_new.columns)
             insert_vals = ", ".join([f"source.{c}" for c in df_new.columns])
 
+            merge_condition = " AND ".join([f"target.{c} = source.{c}" for c in merge_keys])
+            diff_condition = " OR ".join(
+                [
+                    f"target.{c} <> source.{c} OR (target.{c} IS NULL AND source.{c} IS NOT NULL)"
+                    for c in df_new.columns if c not in merge_keys
+                ]
+            )
+
             spark.sql(f"""
                 MERGE INTO {full_table} AS target
                 USING incoming_{table_name} AS source
-                ON target.id = source.id
+                ON {merge_condition}
                 WHEN MATCHED AND (
-                    {" OR ".join([f"target.{c} <> source.{c} OR (target.{c} IS NULL AND source.{c} IS NOT NULL)"
-                                  for c in df_new.columns if c != "id"])}
+                    {diff_condition}
                 ) THEN UPDATE SET {update_set}
                 WHEN NOT MATCHED THEN INSERT ({insert_cols}) VALUES ({insert_vals})
             """)
@@ -130,6 +182,7 @@ def run_ingesta(config):
 
         write_audit_log(spark, config.NAMESPACE, f"{table_name}_bronce", accion, len(records))
         print(f"✅ {table_name} procesado ({accion})")
+        processed.append({"table": table_name, "rows": len(records), "action": accion})
 
         # Compactar
         print(f"🔧 Compactando {full_table}...")
@@ -141,3 +194,5 @@ def run_ingesta(config):
             )
         """)
         print(f"✅ {full_table} compactado")
+
+    return {"status": "ok", "tables": processed}

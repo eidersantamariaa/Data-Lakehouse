@@ -217,7 +217,12 @@ def delete_table(table: str):
         return JSONResponse({"error": "Formato invalido, usa namespace.tabla"}, status_code=400)
 
     cmd = f"DROP TABLE players.{ns}.{tbl_name} PURGE"
-    count = f"SELECT COUNT(*) FROM players.{ns}.{tbl_name}"
+    row_count = 0
+    try:
+        table_obj = catalog.load_table((ns, tbl_name))
+        row_count = int(table_obj.scan().to_arrow().num_rows)
+    except Exception as e:
+        print(f"⚠ could not count rows before delete for {table}: {e}")
     print(f"🗑 executing server command: {cmd}")
 
     try:
@@ -229,12 +234,14 @@ def delete_table(table: str):
             except TypeError:
                 catalog.drop_table((ns, tbl_name))
 
-        audit_written = _write_audit_log(
-            namespace=ns,
-            table_name=tbl_name,
-            accion="DROP",
-            num_registros=count,
-        )
+        audit_written = False
+        if tbl_name != "audit_log":
+            audit_written = _write_audit_log(
+                namespace=ns,
+                table_name=tbl_name,
+                accion="DROP",
+                num_registros=row_count,
+            )
 
         return {
             "status": "ok",
@@ -281,6 +288,90 @@ def tt_changes(table: str, start_snapshot_id: str, end_snapshot_id: str, limit: 
         return _tt().get_incremental_changes(table, int(start_snapshot_id), int(end_snapshot_id), limit)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=400)
+
+@app.post("/ingesta")
+async def ingesta(req: Request):
+    if catalog is None:
+        return JSONResponse({"error": "Catalog not connected"}, status_code=400)
+    
+    try:
+        body = await req.json()
+        apis = body.get("apis", [])
+        namespace = body.get("namespace", "raw").strip()
+        
+        if not apis:
+            return JSONResponse({"error": "No APIs selected"}, status_code=400)
+        
+        if not namespace:
+            namespace = "raw"
+        
+        # Create namespace if not exists
+        try:
+            catalog.create_namespace(namespace)
+        except Exception:
+            pass  # Namespace might already exist
+        
+        results = {}
+        
+        # Process each API
+        for api in apis:
+            try:
+                print(f"\n🚀 Starting ingestion for {api}...")
+                
+                if api == "fbref":
+                    # fbref bronce módulo hace la ingesta directamente
+                    print("📝 Importing fbref_bronce module (ejecuta ingesta directamente)...")
+                    import fbref_bronce
+                    print(f"✅ API fbref ingested successfully")
+                    results[api] = {
+                        "status": "ok",
+                        "tables": ["teams", "players"],
+                        "count": 2
+                    }
+                    
+                elif api in ["transfermarkt", "thesportsdb"]:
+                    # transfermarkt y thesportsdb usan run_ingesta
+                    print(f"📝 Loading {api} with run_ingesta...")
+                    
+                    if api == "transfermarkt":
+                        import transfermarkt_bronce as module
+                    else:  # thesportsdb
+                        import thesportsdb_bronce as module
+                    
+                    # Create config object for run_ingesta
+                    class Config:
+                        NAMESPACE = namespace
+                        get_data = staticmethod(module.get_data)
+                    
+                    # Import and run ingesta
+                    from ingesta import run_ingesta
+                    ingest_result = run_ingesta(Config)
+                    tables_created = [entry["table"] for entry in ingest_result.get("tables", [])]
+                    
+                    results[api] = {
+                        "status": "ok",
+                        "tables": tables_created,
+                        "count": len(tables_created)
+                    }
+                    print(f"✅ API {api} ingested successfully ({len(tables_created)} tables)")
+                    
+                else:
+                    results[api] = {"status": "error", "msg": f"Unknown API: {api}"}
+                    
+            except Exception as e:
+                print(f"❌ Error ingesting {api}: {e}")
+                import traceback
+                traceback.print_exc()
+                results[api] = {"status": "error", "msg": str(e)}
+        
+        return {"status": "ok", "results": results}
+    
+    except Exception as e:
+        print(f"❌ Ingesta error: {e}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({"error": str(e)}, status_code=400)
+
 
 @app.get("/", response_class=HTMLResponse)
 async def root():

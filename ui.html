@@ -34,10 +34,6 @@
 
         body {
             background: #ffffff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
             font-family: var(--font-mono);
         }
 
@@ -55,7 +51,6 @@
 
         button:hover {
             color: var(--color-text-primary);
-            border-color: rgba(255, 255, 255, .2);
         }
 
         button:active {
@@ -90,29 +85,106 @@
             opacity: .6;
         }
 
+        /* ── Shell ── */
         .wrap {
             position: fixed;
             inset: 0;
-            border: none;
-            border-radius: 0;
             overflow: hidden;
             background: var(--color-background-primary);
+            display: flex;
+            flex-direction: column;
         }
 
-        .grid {
-            display: grid;
-            grid-template-rows: 44px 1fr;
-            grid-template-columns: 236px 1fr;
-            height: 100vh;
-        }
-
+        /* ── Header ── */
         .hdr {
-            grid-column: 1/-1;
+            height: 44px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: stretch;
+            padding: 0 14px 0 16px;
+            border-bottom: 0.5px solid var(--color-border-tertiary);
+            gap: 0;
+        }
+
+        .hdr-brand {
             display: flex;
             align-items: center;
-            padding: 0 14px;
-            border-bottom: 0.5px solid var(--color-border-tertiary);
+            gap: 7px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--color-text-primary);
+            margin-right: 20px;
+            white-space: nowrap;
+        }
+
+        .main-nav {
+            display: flex;
+            align-items: stretch;
+        }
+
+        .mnav {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0 16px;
+            font-size: 12px;
+            color: var(--color-text-secondary);
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            transition: color .15s;
+            white-space: nowrap;
+            user-select: none;
+        }
+
+        .mnav:hover {
+            color: var(--color-text-primary);
+        }
+
+        .mnav.on {
+            color: var(--color-text-primary);
+            border-bottom-color: #1D9E75;
+        }
+
+        .mnav.ingesta.on {
+            color: #6e8cff;
+            border-bottom-color: #6e8cff;
+        }
+
+        .mnav.merge.on {
+            color: #e07b39;
+            border-bottom-color: #e07b39;
+        }
+
+        .hdr-right {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
             gap: 8px;
+        }
+
+        /* ── Body ── */
+        .body {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+        }
+
+        .page {
+            display: none;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .page.on {
+            display: flex;
+        }
+
+        /* ── Explorer ── */
+        .explorer-layout {
+            display: grid;
+            grid-template-columns: 236px 1fr;
+            width: 100%;
+            overflow: hidden;
         }
 
         .sidebar {
@@ -120,58 +192,22 @@
             overflow-y: auto;
         }
 
-        .main {
-            overflow: hidden;
+        .explorer-main {
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
 
-        .ns {
-            padding: 10px 12px 4px;
-            font-size: 10px;
-            color: var(--color-text-secondary);
-            font-family: var(--font-mono);
-            letter-spacing: .08em;
-            text-transform: uppercase;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .titem {
-            display: flex;
-            align-items: center;
-            gap: 7px;
-            padding: 6px 14px;
-            cursor: pointer;
-            font-family: var(--font-mono);
-            font-size: 12px;
-            color: var(--color-text-secondary);
-            border-left: 2px solid transparent;
-        }
-
-        .titem:hover {
-            background: var(--color-background-secondary);
-            color: var(--color-text-primary);
-        }
-
-        .titem.sel {
-            background: var(--color-background-secondary);
-            color: var(--color-text-primary);
-            border-left-color: #1D9E75;
-        }
-
-        .tabs {
+        .sub-tabs {
             display: flex;
             border-bottom: 0.5px solid var(--color-border-tertiary);
             padding: 0 16px;
             flex-shrink: 0;
         }
 
-        .tab {
-            padding: 10px 14px;
+        .stab {
+            padding: 9px 14px;
             font-size: 12px;
-            font-family: var(--font-mono);
             cursor: pointer;
             color: var(--color-text-secondary);
             border-bottom: 2px solid transparent;
@@ -179,33 +215,123 @@
             white-space: nowrap;
         }
 
-        .tab.on {
+        .stab:hover {
+            color: var(--color-text-primary);
+        }
+
+        .stab.on {
             color: var(--color-text-primary);
             border-bottom-color: #1D9E75;
         }
 
-        .tab.tt-tab.on {
-            border-bottom-color: #6e8cff;
+        .stab.tt.on {
             color: #6e8cff;
+            border-bottom-color: #6e8cff;
         }
 
-        .tab.merge-tab.on {
-            border-bottom-color: #e07b39;
-            color: #e07b39;
-        }
-
-        .content {
+        .sub-content {
             padding: 16px;
             flex: 1;
             overflow: auto;
         }
 
+        /* ── Ingesta ── */
+        .ingesta-layout {
+            flex: 1;
+            overflow: auto;
+            padding: 24px 28px;
+        }
+
+        .api-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+
+        .api-card {
+            border: 0.5px solid var(--color-border-secondary);
+            border-radius: var(--border-radius-lg);
+            padding: 14px 16px;
+            cursor: pointer;
+            transition: all .15s;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            position: relative;
+        }
+
+        .api-card:hover {
+            background: var(--color-background-secondary);
+        }
+
+        .api-card.sel {
+            background: rgba(110, 140, 255, .06);
+            border-color: rgba(110, 140, 255, .45);
+        }
+
+        .api-check {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            border: 0.5px solid var(--color-border-secondary);
+            background: var(--color-background-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all .12s;
+        }
+
+        .api-card.sel .api-check {
+            background: #6e8cff;
+            border-color: #6e8cff;
+        }
+
+        .api-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--color-text-primary);
+            padding-right: 24px;
+        }
+
+        .api-desc {
+            font-size: 11px;
+            color: var(--color-text-secondary);
+            line-height: 1.5;
+        }
+
+        .api-meta {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .ingesta-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 16px;
+            background: var(--color-background-secondary);
+            border-radius: var(--border-radius-lg);
+            border: 0.5px solid var(--color-border-tertiary);
+        }
+
+        /* ── Merge ── */
+        .merge-layout {
+            flex: 1;
+            overflow: auto;
+            padding: 20px 24px;
+        }
+
+        /* ── Shared ── */
         .badge {
             display: inline-block;
             padding: 2px 6px;
             border-radius: 3px;
             font-size: 11px;
-            font-family: var(--font-mono);
         }
 
         .t-num {
@@ -249,7 +375,6 @@
         .ml {
             font-size: 10px;
             color: var(--color-text-secondary);
-            font-family: var(--font-mono);
             text-transform: uppercase;
             letter-spacing: .06em;
             margin-bottom: 3px;
@@ -257,7 +382,6 @@
 
         .mv {
             font-size: 13px;
-            font-family: var(--font-mono);
             color: var(--color-text-primary);
             font-weight: 500;
         }
@@ -270,7 +394,6 @@
             border-bottom: 0.5px solid var(--color-border-tertiary);
             align-items: center;
             font-size: 12px;
-            font-family: var(--font-mono);
         }
 
         .srow-h {
@@ -284,7 +407,6 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 12px;
-            font-family: var(--font-mono);
         }
 
         .dtbl th {
@@ -317,7 +439,7 @@
         }
 
         .row-removed {
-            opacity: 0.55;
+            opacity: .55;
             background: var(--color-background-danger);
         }
 
@@ -334,7 +456,6 @@
             padding: 10px 0;
             border-bottom: 0.5px solid var(--color-border-tertiary);
             font-size: 12px;
-            font-family: var(--font-mono);
         }
 
         .empty {
@@ -345,14 +466,12 @@
             height: 100%;
             color: var(--color-text-secondary);
             gap: 10px;
-            font-family: var(--font-mono);
             font-size: 12px;
         }
 
         .loc {
             font-size: 11px;
             color: var(--color-text-secondary);
-            font-family: var(--font-mono);
             margin-bottom: 12px;
             padding: 6px 8px;
             background: var(--color-background-secondary);
@@ -368,11 +487,11 @@
 
         /* Modal */
         .ov {
-            position: absolute;
+            position: fixed;
             inset: 0;
             display: none;
             background: rgba(0, 0, 0, .55);
-            z-index: 10;
+            z-index: 100;
             align-items: center;
             justify-content: center;
         }
@@ -407,7 +526,41 @@
             margin-bottom: 10px;
         }
 
-        /* ── Preview column filter chips ── */
+        /* Sidebar */
+        .ns {
+            padding: 10px 12px 4px;
+            font-size: 10px;
+            color: var(--color-text-secondary);
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .titem {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 6px 14px;
+            cursor: pointer;
+            font-size: 12px;
+            color: var(--color-text-secondary);
+            border-left: 2px solid transparent;
+        }
+
+        .titem:hover {
+            background: var(--color-background-secondary);
+            color: var(--color-text-primary);
+        }
+
+        .titem.sel {
+            background: var(--color-background-secondary);
+            color: var(--color-text-primary);
+            border-left-color: #1D9E75;
+        }
+
+        /* Preview */
         .prev-toolbar {
             display: flex;
             align-items: center;
@@ -418,17 +571,15 @@
 
         .prev-col-bar {
             display: flex;
-            align-items: center;
-            gap: 6px;
-            margin-bottom: 10px;
             flex-wrap: wrap;
+            gap: 4px;
             padding: 8px 10px;
             background: var(--color-background-secondary);
             border-radius: var(--border-radius-md);
             border: 0.5px solid var(--color-border-tertiary);
         }
 
-        .prev-col-chip {
+        .pchip {
             padding: 2px 8px;
             border-radius: 3px;
             font-size: 11px;
@@ -440,17 +591,17 @@
             user-select: none;
         }
 
-        .prev-col-chip:hover {
+        .pchip:hover {
             color: var(--color-text-primary);
         }
 
-        .prev-col-chip.on {
+        .pchip.on {
             background: rgba(29, 158, 117, .12);
             border-color: rgba(29, 158, 117, .45);
             color: #1D9E75;
         }
 
-        /* ── Time Travel styles ── */
+        /* TT */
         .tt-modes {
             display: flex;
             gap: 4px;
@@ -466,7 +617,6 @@
             background: transparent;
             color: var(--color-text-secondary);
             cursor: pointer;
-            transition: all .15s;
         }
 
         .tt-mode-btn:hover {
@@ -495,7 +645,7 @@
             flex-wrap: wrap;
         }
 
-        .tt-label {
+        .tt-lbl {
             font-size: 11px;
             color: var(--color-text-secondary);
             min-width: 80px;
@@ -516,14 +666,14 @@
             gap: 8px;
         }
 
-        .tt-result-hdr span.ok {
+        .tt-result-hdr .ok {
             color: var(--color-text-success);
             font-size: 11px;
             text-transform: none;
             letter-spacing: 0;
         }
 
-        .tt-result-hdr span.err {
+        .tt-result-hdr .err {
             color: var(--color-text-danger);
             font-size: 11px;
             text-transform: none;
@@ -538,84 +688,28 @@
             font-size: 11px;
             color: var(--color-text-warning);
             margin-bottom: 12px;
-            display: flex;
-            align-items: flex-start;
-            gap: 6px;
         }
 
-        .snap-pick {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            max-height: 200px;
-            overflow-y: auto;
-            margin-bottom: 10px;
-        }
-
-        .snap-pick-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 6px 10px;
-            border-radius: var(--border-radius-md);
-            border: 0.5px solid transparent;
-            cursor: pointer;
-            font-size: 12px;
-            transition: all .12s;
-        }
-
-        .snap-pick-item:hover {
-            background: var(--color-background-secondary);
-        }
-
-        .snap-pick-item.sel {
-            background: rgba(110, 140, 255, .1);
-            border-color: rgba(110, 140, 255, .3);
-        }
-
-        .snap-pick-item .sid {
-            color: var(--color-text-secondary);
-            font-size: 11px;
-            flex: 1;
-        }
-
-        .snap-pick-item .sts {
-            font-size: 11px;
-            color: var(--color-text-secondary);
-            margin-left: auto;
-        }
-
-        .spinning {
-            display: inline-block;
-            animation: spin .7s linear infinite;
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        .tt-btn-success {
+        .btn-success {
             background: var(--color-background-success);
             color: var(--color-text-success);
             border-color: var(--color-border-success);
         }
 
-        .tt-btn-danger {
+        .btn-danger {
             background: var(--color-background-danger);
             color: var(--color-text-danger);
             border-color: rgba(248, 81, 73, .35);
         }
 
-        .tt-btn-info {
+        .btn-info {
             background: var(--color-background-info);
             color: var(--color-text-info);
             border-color: rgba(79, 140, 255, .35);
         }
 
-        /* ── Merge styles ── */
-        .merge-section-title {
+        /* Merge */
+        .merge-st {
             font-size: 10px;
             color: var(--color-text-secondary);
             text-transform: uppercase;
@@ -626,11 +720,11 @@
             gap: 8px;
         }
 
-        .merge-section-title:first-child {
+        .merge-st:first-child {
             margin-top: 0;
         }
 
-        .merge-candidate {
+        .merge-cand {
             display: grid;
             grid-template-columns: 1fr auto auto auto auto;
             gap: 8px;
@@ -638,22 +732,6 @@
             padding: 8px 0;
             border-bottom: 0.5px solid var(--color-border-tertiary);
             font-size: 12px;
-        }
-
-        .merge-candidate-cols {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        .merge-candidate-col {
-            font-size: 11px;
-            color: var(--color-text-secondary);
-        }
-
-        .merge-candidate-col b {
-            color: var(--color-text-primary);
-            font-weight: 400;
         }
 
         .merge-group {
@@ -668,24 +746,19 @@
             font-size: 12px;
         }
 
-        .merge-group-name {
+        .mg-name {
             font-weight: 500;
             color: #e07b39;
             min-width: 80px;
         }
 
-        .merge-group-arrow {
-            color: var(--color-text-secondary);
-            font-size: 10px;
-        }
-
-        .merge-group-sources {
+        .mg-src {
             flex: 1;
             color: var(--color-text-secondary);
             font-size: 11px;
         }
 
-        .merge-group-tb {
+        .mg-tb {
             font-size: 10px;
             color: var(--color-text-secondary);
             padding: 2px 6px;
@@ -693,7 +766,7 @@
             border-radius: 3px;
         }
 
-        .merge-col-list {
+        .mchip-list {
             display: flex;
             flex-wrap: wrap;
             gap: 4px;
@@ -706,7 +779,7 @@
             margin-bottom: 8px;
         }
 
-        .merge-col-chip {
+        .mchip {
             padding: 3px 8px;
             border-radius: 3px;
             font-size: 11px;
@@ -718,30 +791,41 @@
             user-select: none;
         }
 
-        .merge-col-chip:hover {
-            color: var(--color-text-primary);
+        .mchip:hover {
             border-color: rgba(224, 123, 57, .4);
+            color: var(--color-text-primary);
         }
 
-        .merge-col-chip.selected {
+        .mchip.sel {
             background: rgba(224, 123, 57, .1);
             border-color: rgba(224, 123, 57, .5);
             color: #e07b39;
         }
 
-        .merge-empty {
+        .mempty {
             font-size: 12px;
             color: var(--color-text-secondary);
             font-style: italic;
             padding: 8px 0;
         }
 
-        .merge-manual-form {
+        .mform {
             display: grid;
             grid-template-columns: 1fr 1fr auto;
             gap: 8px;
             align-items: end;
             margin-top: 10px;
+        }
+
+        .spinning {
+            display: inline-block;
+            animation: spin .7s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
         }
     </style>
 </head>
@@ -754,98 +838,231 @@
             <div class="modal">
                 <h3>connect to garage s3</h3>
                 <label class="flabel">endpoint url</label>
-                <input class="finput" type="text" id="f-ep" placeholder="https://s3.garage.example.com" />
+                <input class="finput" id="f-ep" placeholder="https://s3.garage.example.com" />
                 <label class="flabel">access key id</label>
-                <input class="finput" type="text" id="f-ak" placeholder="GKxxxxxxxxxxxxxxxxxxxx" />
+                <input class="finput" id="f-ak" placeholder="GKxxxxxxxxxxxxxxxxxxxx" />
                 <label class="flabel">secret access key</label>
-                <input class="finput" type="text" id="f-sk" placeholder="••••••••••••••••••••••••" />
+                <input class="finput" id="f-sk" placeholder="••••••••••••••••••••••••" />
                 <label class="flabel">bucket</label>
-                <input class="finput" type="text" id="f-bk" placeholder="warehouse" />
+                <input class="finput" id="f-bk" placeholder="warehouse" />
                 <label class="flabel">warehouse prefix (optional)</label>
-                <input class="finput" type="text" id="f-wp" placeholder="iceberg/" />
+                <input class="finput" id="f-wp" placeholder="iceberg/" />
                 <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
                     <button onclick="closeOv()">cancel</button>
-                    <button class="tt-btn-success" onclick="doConnect()">connect</button>
+                    <button class="btn-success" onclick="doConnect()">connect</button>
                 </div>
             </div>
         </div>
 
-        <div class="grid">
-
-            <!-- Header -->
-            <div class="hdr">
+        <!-- ── Header ── -->
+        <div class="hdr">
+            <div class="hdr-brand">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                     <path d="M3 6l9-3 9 3v12l-9 3-9-3V6z" />
                     <path d="M12 3v18M3 6l9 3 9-3" />
                 </svg>
-                <span style="font-size:13px;font-weight:500">iceberg explorer</span>
-                <div style="flex:1"></div>
+                iceberg
+            </div>
+            <nav class="main-nav">
+                <div class="mnav ingesta" id="mnav-ingesta" onclick="switchMain('ingesta')">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    ingesta
+                </div>
+                <div class="mnav on" id="mnav-explorer" onclick="switchMain('explorer')">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="1.5">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <path d="M3 9h18M9 9v12" />
+                    </svg>
+                    explorer
+                </div>
+                <div class="mnav merge" id="mnav-merge" onclick="switchMain('merge')">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path
+                            d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+                    </svg>
+                    merge columns
+                </div>
+            </nav>
+            <div class="hdr-right">
                 <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--color-text-secondary)">
                     <div class="dot" id="dot" style="background:var(--color-text-warning)"></div>
                     <span id="clbl">demo mode</span>
                 </div>
-                <button onclick="showOv()" style="font-size:11px;padding:4px 10px;margin-left:10px">connect</button>
+                <button onclick="showOv()" style="font-size:11px;padding:4px 10px">connect</button>
+            </div>
+        </div>
+
+        <!-- ── Body ── -->
+        <div class="body">
+
+            <!-- INGESTA -->
+            <div class="page" id="page-ingesta">
+                <div class="ingesta-layout">
+                    <div style="margin-bottom:20px">
+                        <div style="font-size:14px;font-weight:500;margin-bottom:4px">ingesta</div>
+                        <div style="font-size:12px;color:var(--color-text-secondary)">selecciona una o varias APIs para
+                            ingestar datos en el catálogo</div>
+                    </div>
+                    <div
+                        style="font-size:10px;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">
+                        apis disponibles</div>
+                    <div class="api-grid" id="api-grid"></div>
+                    <div class="ingesta-bar">
+                        <span id="ingesta-count" style="font-size:12px;color:var(--color-text-secondary)">0 apis
+                            seleccionadas</span>
+                        <div style="flex:1"></div>
+                        <div style="display:flex;align-items:center;gap:6px">
+                            <span style="font-size:11px;color:var(--color-text-secondary)">namespace</span>
+                            <input id="ingesta-ns" placeholder="raw" style="width:100px;font-size:11px">
+                        </div>
+                        <button class="btn-info" id="ingesta-btn" onclick="doIngesta()" disabled>▶ ingestar
+                            seleccionadas</button>
+                    </div>
+                    <div id="ingesta-result" class="tt-result"></div>
+                </div>
             </div>
 
-            <!-- Sidebar -->
-            <div class="sidebar" id="sidebar"></div>
-
-            <!-- Main -->
-            <div class="main">
-                <div class="tabs" id="tabs" style="display:none">
-                    <div class="tab on" onclick="switchTab('schema',this)">schema</div>
-                    <div class="tab" onclick="switchTab('data',this)">preview</div>
-                    <div class="tab" onclick="switchTab('snapshots',this)">snapshots</div>
-                    <div class="tab tt-tab" onclick="switchTab('timetravel',this)">⏱ time travel</div>
-                    <div class="tab merge-tab" onclick="switchTab('merge',this)">⇌ merge columns</div>
-                </div>
-                <div class="content" id="content">
-                    <div class="empty">
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="1" opacity="0.35">
-                            <path d="M3 6l9-3 9 3v12l-9 3-9-3V6z" />
-                            <path d="M12 3v18M3 6l9 3 9-3" />
-                        </svg>
-                        <span>select a table to explore</span>
+            <!-- EXPLORER -->
+            <div class="page on" id="page-explorer">
+                <div class="explorer-layout">
+                    <div class="sidebar" id="sidebar"></div>
+                    <div class="explorer-main">
+                        <div class="sub-tabs" id="sub-tabs" style="display:none">
+                            <div class="stab on" onclick="switchSub('schema',this)">schema</div>
+                            <div class="stab" onclick="switchSub('data',this)">preview</div>
+                            <div class="stab" onclick="switchSub('snapshots',this)">snapshots</div>
+                            <div class="stab tt" onclick="switchSub('timetravel',this)">time travel</div>
+                        </div>
+                        <div class="sub-content" id="sub-content">
+                            <div class="empty">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="1" opacity="0.35">
+                                    <path d="M3 6l9-3 9 3v12l-9 3-9-3V6z" />
+                                    <path d="M12 3v18M3 6l9 3 9-3" />
+                                </svg>
+                                <span>select a table to explore</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            <!-- MERGE -->
+            <div class="page" id="page-merge">
+                <div class="merge-layout" id="merge-layout">
+                    <div class="empty" style="height:100%">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1" opacity="0.3">
+                            <path
+                                d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+                        </svg>
+                        <span>selecciona una tabla en explorer primero</span>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 
     <script>
-        let T = {}, sel = null, curTab = 'schema';
+        /* ── State ── */
+        let T = {}, sel = null, curSub = 'schema';
+        let prevHiddenCols = new Set();
+        let mergeConfig = [], allCols = [], selectedManualCols = new Set();
+        let selectedAPIs = new Set();
+
+        const APIS = [
+            { id: 'transfermarkt', name: 'Transfermarkt', desc: 'Market values, transfers, contract data', tags: ['players', 'transfers'] },
+            { id: 'fbref', name: 'FBref', desc: 'Advanced stats: xG, progressive actions', tags: ['stats', 'matches'] },
+            { id: 'thesportsdb', name: 'TheSportsDB', desc: 'Comprehensive sports data, schedules, results', tags: ['data', 'players'] },
+        ];
+
         const typeClass = { long: 't-num', int: 't-num', string: 't-str', double: 't-dbl', timestamp: 't-ts', boolean: 't-bool' };
         const fmt = n => Number(n).toLocaleString();
         const badge = t => `<span class="badge ${typeClass[t] || 't-str'}">${t}</span>`;
         const esc = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-        // ── Preview state ──────────────────────────────────────────────────────────
-        let prevHiddenCols = new Set(); // columns toggled OFF
+        /* ── Main nav ── */
+        function switchMain(page) {
+            document.querySelectorAll('.mnav').forEach(t => t.classList.remove('on'));
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
+            document.getElementById('mnav-' + page).classList.add('on');
+            document.getElementById('page-' + page).classList.add('on');
+            if (page === 'merge') renderMergeLayout();
+        }
 
-        // ── Merge state ────────────────────────────────────────────────────────────
-        let mergeConfig = [];
-        let allCols = [];
-        let selectedManualCols = new Set();
+        /* ── Ingesta ── */
+        function renderApiGrid() {
+            document.getElementById('api-grid').innerHTML = APIS.map(api => `
+        <div class="api-card${selectedAPIs.has(api.id) ? ' sel' : ''}" onclick="toggleAPI('${api.id}')">
+            <div class="api-check">
+                ${selectedAPIs.has(api.id) ? `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>` : ''}
+            </div>
+            <div class="api-name">${api.name}</div>
+            <div class="api-desc">${api.desc}</div>
+            <div class="api-meta">${api.tags.map(t => `<span class="badge t-ts">${t}</span>`).join('')}</div>
+        </div>`).join('');
+        }
 
-        // ── Sidebar ────────────────────────────────────────────────────────────────
+        function toggleAPI(id) {
+            selectedAPIs.has(id) ? selectedAPIs.delete(id) : selectedAPIs.add(id);
+            renderApiGrid();
+            const n = selectedAPIs.size;
+            document.getElementById('ingesta-count').textContent = `${n} api${n !== 1 ? 's' : ''} seleccionada${n !== 1 ? 's' : ''}`;
+            document.getElementById('ingesta-btn').disabled = n === 0;
+        }
 
+        async function doIngesta() {
+            const ns = document.getElementById('ingesta-ns').value.trim() || 'raw';
+            const apis = [...selectedAPIs];
+            const btn = document.getElementById('ingesta-btn');
+            btn.disabled = true; btn.textContent = '◌ ingestando…';
+            setResult('ingesta-result', `<div class="tt-result-hdr"><span class="spinning">◌</span> iniciando ingesta de: ${apis.join(', ')}…</div>`);
+            try {
+                const r = await fetch('/ingesta', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apis, namespace: ns }) });
+                const data = await r.json();
+                if (data.error) throw new Error(data.error);
+                if (data.status !== 'ok') throw new Error('Ingesta falló');
+
+                const results = data.results || {};
+                const resultsHtml = Object.entries(results).map(([api, result]) => {
+                    if (result.status === 'ok') {
+                        const tables = (result.tables || []).join(', ') || 'sin tablas';
+                        return `<div style="padding:8px 10px;margin-bottom:6px;background:var(--color-background-success);border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-success)">
+                            <b style="color:var(--color-text-success)">${api}</b> <span style="color:var(--color-text-success);font-size:11px">✓ ${tables}</span>
+                        </div>`;
+                    } else {
+                        return `<div style="padding:8px 10px;margin-bottom:6px;background:var(--color-background-danger);border-radius:var(--border-radius-md);border:0.5px solid rgba(248, 81, 73, .35)">
+                            <b style="color:var(--color-text-danger)">${api}</b> <span style="color:var(--color-text-danger);font-size:11px">✗ ${esc(result.msg || 'error desconocido')}</span>
+                        </div>`;
+                    }
+                }).join('');
+
+                setResult('ingesta-result', `
+                <div class="tt-result-hdr"><span class="ok">✓ ingesta completada</span></div>
+                <div style="margin-top:12px">${resultsHtml}</div>`);
+                loadTables();
+            } catch (e) {
+                setResult('ingesta-result', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`);
+            } finally { btn.disabled = false; btn.textContent = '▶ ingestar seleccionadas'; }
+        }
+
+        /* ── Sidebar ── */
         function renderSidebar() {
             const ns = {};
             Object.keys(T).forEach(k => { const [n, t] = k.split('.'); (ns[n] = ns[n] || []).push({ k, t }); });
             let h = '';
             Object.entries(ns).forEach(([n, tables]) => {
                 h += `<div class="ns"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-4 0v2"/></svg>${n}</div>`;
-                tables.forEach(({ k, t }) => {
-                    h += `<div class="titem${sel === k ? ' sel' : ''}" onclick="pick('${k}')">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 9v12"/></svg>
-                ${t}</div>`;
-                });
+                tables.forEach(({ k, t }) => h += `<div class="titem${sel === k ? ' sel' : ''}" onclick="pick('${k}')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 9v12"/></svg>${t}</div>`);
             });
             document.getElementById('sidebar').innerHTML = h || '<div class="ns">no tables</div>';
         }
-
-        // ── Load data ──────────────────────────────────────────────────────────────
 
         async function loadTables() {
             const r = await fetch('/tables'); T = {};
@@ -853,51 +1070,42 @@
         }
 
         async function pick(k) {
-            sel = k; curTab = 'schema';
-            mergeConfig = []; allCols = []; selectedManualCols = new Set();
-            prevHiddenCols = new Set();
+            sel = k; curSub = 'schema';
+            mergeConfig = []; allCols = []; selectedManualCols = new Set(); prevHiddenCols = new Set();
             const [schema, preview, snapsData] = await Promise.all([
                 fetch(`/schema/${k}`).then(r => r.json()),
                 fetch(`/preview/${k}?limit=50`).then(r => r.json()),
                 fetch(`/snapshots/${k}`).then(r => r.json()),
             ]);
-            // preview.schema es la fuente canónica para columnas en preview tab
-            T[k] = {
-                ...schema,
-                previewSchema: preview.schema || schema.schema || [],
-                preview: preview.preview || [],
-                snap: preview.snap || '—',
-                snaps: snapsData.snaps || []
-            };
-            document.getElementById('tabs').style.display = 'flex';
-            renderSidebar(); renderContent();
+            T[k] = { ...schema, previewSchema: preview.schema || schema.schema || [], preview: preview.preview || [], snap: preview.snap || '—', snaps: snapsData.snaps || [] };
+            document.getElementById('sub-tabs').style.display = 'flex';
+            renderSidebar(); renderSubContent();
         }
 
-        // ── Render tabs ────────────────────────────────────────────────────────────
-
-        function renderContent() {
+        /* ── Sub-tabs ── */
+        function renderSubContent() {
             if (!sel) return;
             const d = T[sel];
-            if (curTab === 'schema') document.getElementById('content').innerHTML = renderSchema(d);
-            else if (curTab === 'data') document.getElementById('content').innerHTML = renderData(d);
-            else if (curTab === 'snapshots') document.getElementById('content').innerHTML = renderSnaps(d);
-            else if (curTab === 'timetravel') document.getElementById('content').innerHTML = renderTimeTravel(d);
-            else if (curTab === 'merge') renderMergeTab();
+            const el = document.getElementById('sub-content');
+            if (curSub === 'schema') el.innerHTML = renderSchema(d);
+            else if (curSub === 'data') el.innerHTML = renderData(d);
+            else if (curSub === 'snapshots') el.innerHTML = renderSnaps(d);
+            else if (curSub === 'timetravel') el.innerHTML = renderTimeTravel(d);
         }
 
-        function switchTab(t, el) {
-            curTab = t;
-            document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+        function switchSub(t, el) {
+            curSub = t;
+            document.querySelectorAll('.stab').forEach(x => x.classList.remove('on'));
             el.classList.add('on');
-            renderContent();
+            renderSubContent();
         }
 
+        /* ── Schema ── */
         function renderSchema(d) {
-            const rows = d.schema.map(f => `
+            const rows = (d.schema || []).map(f => `
         <div class="srow">
             <span style="color:var(--color-text-secondary);font-size:11px">${f.id}</span>
-            <span>${f.n}</span>
-            ${badge(f.t)}
+            <span>${f.n}</span>${badge(f.t)}
             <span style="font-size:11px;color:${f.req ? 'var(--color-text-success)' : 'var(--color-text-secondary)'}">${f.req ? 'req' : ''}</span>
         </div>`).join('');
             return `
@@ -910,131 +1118,93 @@
         <div class="loc">📍 ${d.loc}</div>
         <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:10px;margin-bottom:12px">
             <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:8px">danger zone</div>
-            <button class="tt-btn-danger" onclick="doDeleteTable()">delete table</button>
+            <button class="btn-danger" onclick="doDeleteTable()">delete table</button>
             <div id="tbl-del-result" class="tt-result" style="margin-top:8px"></div>
         </div>
         <div class="srow srow-h"><span></span><span>field</span><span>type</span><span>req</span></div>
         ${rows}`;
         }
 
-        // ── Preview tab ────────────────────────────────────────────────────────────
-
+        /* ── Preview ── */
         function renderData(d) {
-            // previewSchema = schema devuelto por /preview/, más fiable que /schema/ para esta tab
             const schema = d.previewSchema || d.schema || [];
             const cols = schema.map(f => f.n);
-
-            if (cols.length === 0) {
-                return `<div style="font-size:12px;color:var(--color-text-danger);padding:16px 0">
-                    ✗ schema vacío — recarga la página o reconecta al catálogo.
-                </div>`;
-            }
+            if (!cols.length) return `<div style="font-size:12px;color:var(--color-text-danger);padding:16px 0">✗ schema vacío — reconecta al catálogo.</div>`;
 
             const chips = cols.map(c => {
-                const safeC = c.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                const isOn = !prevHiddenCols.has(c);
-                return `<span class="prev-col-chip${isOn ? ' on' : ''}" onclick="togglePrevCol(this,'${safeC}')">${esc(c)}</span>`;
+                const safe = c.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                const on = !prevHiddenCols.has(c);
+                return `<span class="pchip${on ? ' on' : ''}" onclick="togglePrevCol(this,'${safe}')">${esc(c)}</span>`;
             }).join('');
 
             return `
-                <div class="prev-toolbar">
-                    <span class="tt-label">limit</span>
-                    <input type="number" id="prev-limit" value="${d.preview.length || 50}" min="1" max="10000" style="width:70px">
-                    <button class="tt-btn-info" onclick="doPreview()">load</button>
-                    <span id="prev-meta" style="font-size:11px;color:var(--color-text-secondary)">
-                        ${d.preview.length} rows shown &nbsp;·&nbsp; ${fmt(d.rows)} total &nbsp;·&nbsp; snap ${d.snap}
-                    </span>
-                </div>
-
-                <div style="margin-bottom:10px">
-                    <div style="font-size:10px;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;display:flex;align-items:center;gap:8px">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-                        columns
-                        <button onclick="prevColAll(true)" style="font-size:10px;padding:1px 8px;text-transform:none;letter-spacing:0">all</button>
-                        <button onclick="prevColAll(false)" style="font-size:10px;padding:1px 8px;text-transform:none;letter-spacing:0">none</button>
-                        <span id="prev-col-count" style="color:var(--color-text-secondary);font-size:10px;text-transform:none;letter-spacing:0">${cols.length} / ${cols.length} visible</span>
-                    </div>
-                    <div class="prev-col-bar" id="prev-col-bar">${chips}</div>
-                </div>
-
-                <div id="prev-table-wrap" style="overflow-x:auto">
-                    ${buildPreviewTable(d.preview, cols)}
-                </div>
-            `;
+        <div class="prev-toolbar">
+            <span style="font-size:11px;color:var(--color-text-secondary)">limit</span>
+            <input type="number" id="prev-limit" value="${d.preview.length || 50}" min="1" max="10000" style="width:70px">
+            <button class="btn-info" onclick="doPreview()">load</button>
+            <span id="prev-meta" style="font-size:11px;color:var(--color-text-secondary)">
+                ${d.preview.length} shown &nbsp;·&nbsp; ${fmt(d.rows)} total &nbsp;·&nbsp; snap ${d.snap}
+            </span>
+        </div>
+        <div style="margin-bottom:10px">
+            <div style="font-size:10px;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;display:flex;align-items:center;gap:8px">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                columns
+                <button onclick="prevColAll(true)"  style="font-size:10px;padding:1px 8px;text-transform:none;letter-spacing:0">all</button>
+                <button onclick="prevColAll(false)" style="font-size:10px;padding:1px 8px;text-transform:none;letter-spacing:0">none</button>
+                <span id="prev-col-count" style="font-size:10px;color:var(--color-text-secondary);text-transform:none;letter-spacing:0">${cols.length}/${cols.length} visible</span>
+            </div>
+            <div class="prev-col-bar">${chips}</div>
+        </div>
+        <div id="prev-table-wrap" style="overflow-x:auto">${buildPreviewTable(d.preview, cols)}</div>`;
         }
 
         function buildPreviewTable(rows, cols) {
-            if (!rows || rows.length === 0) {
-                return `<div style="font-size:12px;color:var(--color-text-secondary);padding:12px 0">no rows returned</div>`;
-            }
-            const visibleCols = cols.filter(c => !prevHiddenCols.has(c));
-            if (visibleCols.length === 0) {
-                return `<div style="font-size:12px;color:var(--color-text-secondary);padding:12px 0">no columns selected</div>`;
-            }
-            const ths = visibleCols.map(c => `<th>${esc(c)}</th>`).join('');
-            const trs = rows.map(row => `<tr>${visibleCols.map(c => {
-                const v = row[c];
-                return v === null ? `<td><span class="null">null</span></td>` : `<td>${esc(String(v))}</td>`;
-            }).join('')}</tr>`).join('');
+            if (!rows || !rows.length) return `<div style="font-size:12px;color:var(--color-text-secondary);padding:12px 0">no rows returned</div>`;
+            const vis = cols.filter(c => !prevHiddenCols.has(c));
+            if (!vis.length) return `<div style="font-size:12px;color:var(--color-text-secondary);padding:12px 0">no columns selected</div>`;
+            const ths = vis.map(c => `<th>${esc(c)}</th>`).join('');
+            const trs = rows.map(row => `<tr>${vis.map(c => { const v = row[c]; return v === null ? `<td><span class="null">null</span></td>` : `<td>${esc(String(v))}</td>`; }).join('')}</tr>`).join('');
             return `<table class="dtbl"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>`;
         }
 
         function togglePrevCol(el, col) {
-            if (prevHiddenCols.has(col)) {
-                prevHiddenCols.delete(col);
-                el.classList.add('on');
-            } else {
-                prevHiddenCols.add(col);
-                el.classList.remove('on');
-            }
-            // Re-render only the table part (no full re-render, preserves limit input)
-            const d = T[sel];
-            document.getElementById('prev-table-wrap').innerHTML = buildPreviewTable(d.preview, d.schema.map(f => f.n));
+            prevHiddenCols.has(col) ? (prevHiddenCols.delete(col), el.classList.add('on')) : (prevHiddenCols.add(col), el.classList.remove('on'));
+            const d = T[sel]; const cols = (d.previewSchema || d.schema || []).map(f => f.n);
+            document.getElementById('prev-table-wrap').innerHTML = buildPreviewTable(d.preview, cols);
+            const cc = document.getElementById('prev-col-count');
+            if (cc) cc.textContent = `${cols.length - prevHiddenCols.size}/${cols.length} visible`;
         }
 
         function prevColAll(on) {
-            if (on) {
-                prevHiddenCols = new Set();
-            } else {
-                prevHiddenCols = new Set(T[sel].schema.map(f => f.n));
-            }
-            // Re-render the whole data tab to update chip states + table
-            document.getElementById('content').innerHTML = renderData(T[sel]);
+            prevHiddenCols = on ? new Set() : new Set((T[sel].previewSchema || T[sel].schema || []).map(f => f.n));
+            document.getElementById('sub-content').innerHTML = renderData(T[sel]);
         }
 
         async function doPreview() {
             if (!sel) return;
             const limit = parseInt(document.getElementById('prev-limit').value) || 50;
-            const btn = document.querySelector('#content .tt-btn-info');
+            const btn = document.querySelector('#sub-content .btn-info');
             if (btn) { btn.disabled = true; btn.textContent = '…'; }
-
             try {
                 const r = await fetch(`/preview/${sel}?limit=${limit}`);
                 const data = await r.json();
                 if (data.error) throw new Error(data.error);
-
                 T[sel].preview = data.preview || [];
                 T[sel].snap = data.snap || '—';
-
-                // Update meta line
-                const metaEl = document.getElementById('prev-meta');
-                if (metaEl) metaEl.textContent = `${data.preview.length} rows shown · ${fmt(T[sel].rows)} total · snap ${data.snap}`;
-
-                // Re-render table
-                const cols = T[sel].schema.map(f => f.n);
+                const m = document.getElementById('prev-meta');
+                if (m) m.textContent = `${data.preview.length} shown · ${fmt(T[sel].rows)} total · snap ${data.snap}`;
+                const cols = (T[sel].previewSchema || T[sel].schema || []).map(f => f.n);
                 document.getElementById('prev-table-wrap').innerHTML = buildPreviewTable(data.preview || [], cols);
             } catch (e) {
-                const wrap = document.getElementById('prev-table-wrap');
-                if (wrap) wrap.innerHTML = `<div style="font-size:12px;color:var(--color-text-danger);padding:8px 0">✗ ${esc(e.message)}</div>`;
-            } finally {
-                if (btn) { btn.disabled = false; btn.textContent = 'load'; }
-            }
+                const w = document.getElementById('prev-table-wrap');
+                if (w) w.innerHTML = `<div style="font-size:12px;color:var(--color-text-danger);padding:8px 0">✗ ${esc(e.message)}</div>`;
+            } finally { if (btn) { btn.disabled = false; btn.textContent = 'load'; } }
         }
 
-        // ── Snapshots tab ──────────────────────────────────────────────────────────
-
+        /* ── Snapshots ── */
         function renderSnaps(d) {
-            return d.snaps.map((s, i) => `
+            return (d.snaps || []).map(s => `
         <div class="snap">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
                 ${s.current ? '<span class="badge" style="background:var(--color-background-success);color:var(--color-text-success)">current</span>' : ''}
@@ -1043,535 +1213,309 @@
             </div>
             <div style="display:flex;gap:16px;flex-wrap:wrap">
                 <span style="color:var(--color-text-secondary)">op: <b style="color:var(--color-text-primary);font-weight:400">${s.op}</b></span>
-                <span style="color:var(--color-text-secondary)">added: <b style="font-weight:400;color:var(--color-text-primary)">${s.add}</b></span>
-                <span style="color:var(--color-text-secondary)">removed: <b style="font-weight:400;color:var(--color-text-primary)">${s.rem}</b></span>
-                <span style="color:var(--color-text-secondary)">records: <b style="font-weight:400;color:var(--color-text-success)">${s.rec}</b></span>
+                <span style="color:var(--color-text-secondary)">added: <b style="font-weight:400">${s.add}</b></span>
+                <span style="color:var(--color-text-secondary)">removed: <b style="font-weight:400">${s.rem}</b></span>
+                <span style="color:var(--color-text-secondary)">records: <b style="color:var(--color-text-success);font-weight:400">${s.rec}</b></span>
             </div>
         </div>`).join('');
         }
 
-        // ── Merge tab ──────────────────────────────────────────────────────────────
+        /* ── Time travel ── */
+        function renderTimeTravel(d) {
+            const so = (d.snaps || []).map(s => `<option value="${s.id}">[${s.ts}] ${s.id}${s.current ? ' ← current' : ''}</option>`).join('');
+            return `
+        <div class="tt-modes">
+            <button class="tt-mode-btn on" onclick="ttMode('read',this)">read version</button>
+            <button class="tt-mode-btn"    onclick="ttMode('rollback',this)">rollback</button>
+            <button class="tt-mode-btn"    onclick="ttMode('changes',this)">incremental changes</button>
+        </div>
+        <div class="tt-panel on" id="tt-read">
+            <div class="tt-row">
+                <span class="tt-lbl">by</span>
+                <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" name="tt-rm" value="snapshot" checked onchange="ttRM(this)"> snapshot id</label>
+                <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" name="tt-rm" value="timestamp" onchange="ttRM(this)"> timestamp</label>
+            </div>
+            <div class="tt-row" id="tt-rs"><span class="tt-lbl">snapshot</span><select id="tt-read-snap" style="flex:1;max-width:360px">${so}</select></div>
+            <div class="tt-row" id="tt-rt" style="display:none"><span class="tt-lbl">datetime</span><input type="datetime-local" id="tt-read-ts" style="flex:1;max-width:280px"></div>
+            <div class="tt-row">
+                <span class="tt-lbl">limit</span>
+                <input type="number" id="tt-read-limit" value="50" style="width:70px">
+                <button class="btn-info" onclick="doReadVersion()">load preview</button>
+            </div>
+            <div class="tt-result" id="tt-read-result"></div>
+        </div>
+        <div class="tt-panel" id="tt-rollback">
+            <div class="warn-box">⚠ rollback cambia el snapshot actual. esta operacion no se puede deshacer desde la UI.</div>
+            <div class="tt-row">
+                <span class="tt-lbl">by</span>
+                <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" name="tt-rbm" value="snapshot" checked onchange="ttRBM(this)"> snapshot id</label>
+                <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" name="tt-rbm" value="timestamp" onchange="ttRBM(this)"> timestamp</label>
+            </div>
+            <div class="tt-row" id="tt-rbs"><span class="tt-lbl">target</span><select id="tt-rb-snap" style="flex:1;max-width:360px">${so}</select></div>
+            <div class="tt-row" id="tt-rbt" style="display:none"><span class="tt-lbl">datetime</span><input type="datetime-local" id="tt-rb-ts" style="flex:1;max-width:280px"></div>
+            <div class="tt-row"><button class="btn-danger" onclick="doRollback()">rollback table</button></div>
+            <div class="tt-result" id="tt-rb-result"></div>
+        </div>
+        <div class="tt-panel" id="tt-changes">
+            <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:12px">muestra los registros añadidos entre dos snapshots.</div>
+            <div class="tt-row"><span class="tt-lbl">from snap</span><select id="tt-ch-from" style="flex:1;max-width:320px">${so}</select></div>
+            <div class="tt-row"><span class="tt-lbl">to snap</span><select id="tt-ch-to" style="flex:1;max-width:320px">${so}</select></div>
+            <div class="tt-row">
+                <span class="tt-lbl">limit</span>
+                <input type="number" id="tt-ch-limit" value="200" style="width:70px">
+                <button class="btn-info" onclick="doChanges()">compute changes</button>
+            </div>
+            <div class="tt-result" id="tt-ch-result"></div>
+        </div>`;
+        }
 
-        function renderMergeTab() {
+        function ttMode(m, el) {
+            document.querySelectorAll('.tt-mode-btn').forEach(b => b.classList.remove('on')); el.classList.add('on');
+            document.querySelectorAll('.tt-panel').forEach(p => p.classList.remove('on')); document.getElementById('tt-' + m).classList.add('on');
+        }
+        function ttRM(el) { const s = el.value === 'snapshot'; document.getElementById('tt-rs').style.display = s ? '' : 'none'; document.getElementById('tt-rt').style.display = s ? 'none' : ''; }
+        function ttRBM(el) { const s = el.value === 'snapshot'; document.getElementById('tt-rbs').style.display = s ? '' : 'none'; document.getElementById('tt-rbt').style.display = s ? 'none' : ''; }
+
+        /* ── Merge page ── */
+        function renderMergeLayout() {
+            const el = document.getElementById('merge-layout');
+            if (!sel) {
+                el.innerHTML = `<div class="empty" style="height:100%">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+            </svg>
+            <span>selecciona una tabla en explorer primero</span>
+        </div>`;
+                return;
+            }
             const [ns, tbl] = sel.split('.');
-            const suggestedTarget = `${ns}.${tbl}_merged`;
-
-            document.getElementById('content').innerHTML = `
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-                    <div>
-                        <div style="font-size:13px;font-weight:500;margin-bottom:2px">merge columns</div>
-                        <div style="font-size:11px;color:var(--color-text-secondary)">detect overlapping columns across APIs and consolidate them</div>
-                    </div>
-                    <div style="flex:1"></div>
-                    <select id="merge-umbral" style="width:130px;font-size:11px">
-                        <option value="0.7">strict (70%)</option>
-                        <option value="0.5" selected>normal (50%)</option>
-                        <option value="0.3">fuzzy (30%)</option>
-                    </select>
-                    <button class="tt-btn-info" onclick="detectMerges()" id="detect-btn">detect overlaps</button>
-                </div>
-
-                <div class="merge-section-title">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-6 4 2 7-6-4-6 4 2-7-6-4h7z"/></svg>
-                    recommended
-                    <span id="merge-status" style="color:var(--color-text-secondary);font-weight:400;text-transform:none;letter-spacing:0;font-size:11px"></span>
-                </div>
-                <div id="merge-recommended">
-                    <div class="merge-empty">click "detect overlaps" to find candidate columns</div>
-                </div>
-
-                <div class="merge-section-title" style="margin-top:20px">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-                    manual selection
-                </div>
-                <div id="merge-col-chips" class="merge-col-list">
-                    <span style="font-size:11px;color:var(--color-text-secondary);font-style:italic">columns will appear here after detection</span>
-                </div>
-                <div class="merge-manual-form">
-                    <div>
-                        <label class="flabel">final column name</label>
-                        <input id="merge-manual-name" placeholder="e.g. nationality" style="width:100%">
-                    </div>
-                    <div>
-                        <label class="flabel">tiebreaker</label>
-                        <select id="merge-manual-tb" style="width:100%"><option value="">— select —</option></select>
-                    </div>
-                    <button class="tt-btn-info" onclick="addManualGroup()" style="align-self:end">+ add group</button>
-                </div>
-
-                <div class="merge-section-title" style="margin-top:20px">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-                    config
-                    <span id="merge-count" style="color:var(--color-text-secondary);font-weight:400;text-transform:none;letter-spacing:0;font-size:11px">0 groups</span>
-                </div>
-                <div id="merge-groups">
-                    <div class="merge-empty">no groups yet</div>
-                </div>
-
-                <div style="margin-top:16px">
-                    <label class="flabel">save as (namespace.table)</label>
-                    <div style="display:flex;gap:8px;margin-bottom:12px">
-                        <input id="merge-target-table" placeholder="e.g. mapping.players_unified_merged" value="${suggestedTarget}" style="flex:1;font-size:12px">
-                    </div>
-                    <div style="display:flex;align-items:center;gap:8px">
-                        <button class="tt-btn-success" onclick="applyMerges()" id="apply-btn" disabled>apply & save</button>
-                        <button onclick="clearMerge()" style="font-size:11px">clear all</button>
-                    </div>
-                </div>
-                <div id="merge-result" class="tt-result"></div>
-            `;
+            el.innerHTML = `
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+            <div>
+                <div style="font-size:13px;font-weight:500;margin-bottom:2px">merge columns</div>
+                <div style="font-size:11px;color:var(--color-text-secondary)">tabla activa: <b style="color:var(--color-text-primary)">${sel}</b></div>
+            </div>
+            <div style="flex:1"></div>
+            <select id="merge-umbral" style="width:130px;font-size:11px">
+                <option value="0.7">strict (70%)</option>
+                <option value="0.5" selected>normal (50%)</option>
+                <option value="0.3">fuzzy (30%)</option>
+            </select>
+            <button class="btn-info" onclick="detectMerges()" id="detect-btn">detect overlaps</button>
+        </div>
+        <div class="merge-st">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-6 4 2 7-6-4-6 4 2-7-6-4h7z"/></svg>
+            recommended <span id="merge-status" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px"></span>
+        </div>
+        <div id="merge-recommended"><div class="mempty">click "detect overlaps" to find candidate columns</div></div>
+        <div class="merge-st" style="margin-top:20px">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            manual selection
+        </div>
+        <div id="merge-col-chips" class="mchip-list"><span style="font-size:11px;color:var(--color-text-secondary);font-style:italic">columns will appear here after detection</span></div>
+        <div class="mform">
+            <div><label class="flabel">final column name</label><input id="merge-manual-name" placeholder="e.g. nationality" style="width:100%"></div>
+            <div><label class="flabel">tiebreaker</label><select id="merge-manual-tb" style="width:100%"><option value="">— select —</option></select></div>
+            <button class="btn-info" onclick="addManualGroup()" style="align-self:end">+ add group</button>
+        </div>
+        <div class="merge-st" style="margin-top:20px">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            config <span id="merge-count" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px">0 groups</span>
+        </div>
+        <div id="merge-groups"><div class="mempty">no groups yet</div></div>
+        <div style="margin-top:16px">
+            <label class="flabel">save as (namespace.table)</label>
+            <div style="display:flex;gap:8px;margin-bottom:12px">
+                <input id="merge-target-table" placeholder="e.g. mapping.players_merged" value="${ns}.${tbl}_merged" style="flex:1;font-size:12px">
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+                <button class="btn-success" onclick="applyMerges()" id="apply-btn" disabled>apply & save</button>
+                <button onclick="clearMerge()" style="font-size:11px">clear all</button>
+            </div>
+        </div>
+        <div id="merge-result" class="tt-result"></div>`;
         }
 
         async function detectMerges() {
             if (!sel) return;
             const umbral = document.getElementById('merge-umbral').value;
             const btn = document.getElementById('detect-btn');
-            btn.disabled = true;
-            btn.textContent = 'detecting…';
-            document.getElementById('merge-recommended').innerHTML = `<div style="font-size:12px;color:var(--color-text-secondary)"><span class="spinning">◌</span> analyzing columns…</div>`;
-
+            btn.disabled = true; btn.textContent = 'detecting…';
+            document.getElementById('merge-recommended').innerHTML = `<div style="font-size:12px;color:var(--color-text-secondary)"><span class="spinning">◌</span> analyzing…</div>`;
             try {
                 const r = await fetch(`/merge/detect/${sel}?umbral=${umbral}`);
                 const data = await r.json();
                 if (data.error) throw new Error(data.error);
-
-                allCols = data.columnas;
-                selectedManualCols = new Set();
-
-                document.getElementById('merge-col-chips').innerHTML = allCols.map(c =>
-                    `<span class="merge-col-chip" onclick="toggleChip(this,'${c}')">${c}</span>`
-                ).join('');
-
-                const tbSel = document.getElementById('merge-manual-tb');
-                tbSel.innerHTML = `<option value="">— select —</option>` +
-                    allCols.map(c => `<option value="${c}">${c}</option>`).join('');
-
+                allCols = data.columnas; selectedManualCols = new Set();
+                document.getElementById('merge-col-chips').innerHTML = allCols.map(c => `<span class="mchip" onclick="toggleChip(this,'${c}')">${c}</span>`).join('');
+                const tb = document.getElementById('merge-manual-tb');
+                tb.innerHTML = `<option value="">— select —</option>` + allCols.map(c => `<option value="${c}">${c}</option>`).join('');
                 document.getElementById('merge-status').textContent = `${data.grupos.length} groups found`;
                 const rec = document.getElementById('merge-recommended');
-
-                if (data.grupos.length === 0) {
-                    rec.innerHTML = `<div class="merge-empty">no overlaps found — try a lower threshold</div>`;
-                } else {
-                    rec.innerHTML = data.grupos.map((g, i) => `
-                        <div class="merge-candidate">
-                            <div class="merge-candidate-cols">
-                                ${g.columnas.map(c => `<div class="merge-candidate-col"><b>${c}</b></div>`).join('')}
-                            </div>
-                            <span class="badge t-num">${Math.round(g.coincidencia * 100)}%</span>
-                            <input id="rec-name-${i}" placeholder="column name" style="width:130px;font-size:11px">
-                            <select id="rec-tb-${i}" style="font-size:11px;width:150px">
-                                ${g.columnas.map(c => `<option value="${c}">${c}</option>`).join('')}
-                            </select>
-                            <button onclick='addRecomendada(${i}, ${JSON.stringify(g.columnas)})' style="font-size:11px;white-space:nowrap">+ add</button>
-                        </div>
-                    `).join('');
-                }
+                if (!data.grupos.length) { rec.innerHTML = `<div class="mempty">no overlaps — try lower threshold</div>`; return; }
+                rec.innerHTML = data.grupos.map((g, i) => `
+            <div class="merge-cand">
+                <div>${g.columnas.map(c => `<div style="font-size:11px;color:var(--color-text-secondary)"><b style="color:var(--color-text-primary)">${c}</b></div>`).join('')}</div>
+                <span class="badge t-num">${Math.round(g.coincidencia * 100)}%</span>
+                <input id="rec-name-${i}" placeholder="column name" style="width:130px;font-size:11px">
+                <select id="rec-tb-${i}" style="font-size:11px;width:150px">${g.columnas.map(c => `<option value="${c}">${c}</option>`).join('')}</select>
+                <button onclick='addRecomendada(${i},${JSON.stringify(g.columnas)})' style="font-size:11px;white-space:nowrap">+ add</button>
+            </div>`).join('');
             } catch (e) {
                 document.getElementById('merge-recommended').innerHTML = `<div style="font-size:12px;color:var(--color-text-danger)">✗ ${e.message}</div>`;
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'detect overlaps';
-            }
+            } finally { btn.disabled = false; btn.textContent = 'detect overlaps'; }
         }
 
         function toggleChip(el, col) {
-            if (selectedManualCols.has(col)) {
-                selectedManualCols.delete(col);
-                el.classList.remove('selected');
-            } else {
-                selectedManualCols.add(col);
-                el.classList.add('selected');
-            }
-            const tb = document.getElementById('merge-manual-tb');
-            const prev = tb.value;
-            const opts = selectedManualCols.size > 0
-                ? [...selectedManualCols].map(c => `<option value="${c}"${c === prev ? ' selected' : ''}>${c}</option>`).join('')
-                : allCols.map(c => `<option value="${c}"${c === prev ? ' selected' : ''}>${c}</option>`).join('');
-            tb.innerHTML = `<option value="">— select —</option>` + opts;
+            selectedManualCols.has(col) ? (selectedManualCols.delete(col), el.classList.remove('sel')) : (selectedManualCols.add(col), el.classList.add('sel'));
+            const tb = document.getElementById('merge-manual-tb'), prev = tb.value;
+            const src = selectedManualCols.size > 0 ? [...selectedManualCols] : allCols;
+            tb.innerHTML = `<option value="">— select —</option>` + src.map(c => `<option value="${c}"${c === prev ? ' selected' : ''}>${c}</option>`).join('');
         }
-
-        function addRecomendada(i, columnas) {
-            const name = document.getElementById(`rec-name-${i}`).value.trim();
-            const tb = document.getElementById(`rec-tb-${i}`).value;
-            if (!name) { alert('write a column name'); return; }
-            addGroup({ col_final: name, fuentes: columnas, tiebreaker: tb });
+        function addRecomendada(i, cols) {
+            const name = document.getElementById(`rec-name-${i}`).value.trim(), tb = document.getElementById(`rec-tb-${i}`).value;
+            if (!name) { alert('write a column name'); return; } addGroup({ col_final: name, fuentes: cols, tiebreaker: tb });
         }
-
         function addManualGroup() {
-            const selected = [...selectedManualCols];
-            const name = document.getElementById('merge-manual-name').value.trim();
-            const tb = document.getElementById('merge-manual-tb').value;
-            if (!name) { alert('write a column name'); return; }
-            if (selected.length < 2) { alert('select at least 2 columns'); return; }
-            if (!tb) { alert('select a tiebreaker'); return; }
-            addGroup({ col_final: name, fuentes: selected, tiebreaker: tb });
-            document.getElementById('merge-manual-name').value = '';
-            selectedManualCols = new Set();
-            document.querySelectorAll('.merge-col-chip').forEach(c => c.classList.remove('selected'));
+            const sel2 = [...selectedManualCols], name = document.getElementById('merge-manual-name').value.trim(), tb = document.getElementById('merge-manual-tb').value;
+            if (!name) { alert('write a column name'); return; } if (sel2.length < 2) { alert('select at least 2 columns'); return; } if (!tb) { alert('select a tiebreaker'); return; }
+            addGroup({ col_final: name, fuentes: sel2, tiebreaker: tb });
+            document.getElementById('merge-manual-name').value = ''; selectedManualCols = new Set();
+            document.querySelectorAll('.mchip').forEach(c => c.classList.remove('sel'));
         }
-
         function addGroup(entry) {
-            if (mergeConfig.find(g => g.col_final === entry.col_final)) {
-                alert(`A group named "${entry.col_final}" already exists`);
-                return;
-            }
-            mergeConfig.push(entry);
-            renderGroups();
+            if (mergeConfig.find(g => g.col_final === entry.col_final)) { alert(`"${entry.col_final}" already exists`); return; }
+            mergeConfig.push(entry); renderGroups();
         }
-
-        function removeGroup(i) {
-            mergeConfig.splice(i, 1);
-            renderGroups();
-        }
-
-        function clearMerge() {
-            mergeConfig = [];
-            renderGroups();
-        }
-
+        function removeGroup(i) { mergeConfig.splice(i, 1); renderGroups(); }
+        function clearMerge() { mergeConfig = []; renderGroups(); }
         function renderGroups() {
-            const el = document.getElementById('merge-groups');
-            const countEl = document.getElementById('merge-count');
-            const applyBtn = document.getElementById('apply-btn');
-
-            countEl.textContent = `${mergeConfig.length} group${mergeConfig.length !== 1 ? 's' : ''}`;
-            applyBtn.disabled = mergeConfig.length === 0;
-
-            if (mergeConfig.length === 0) {
-                el.innerHTML = `<div class="merge-empty">no groups yet</div>`;
-                return;
-            }
+            const el = document.getElementById('merge-groups'), cnt = document.getElementById('merge-count'), ab = document.getElementById('apply-btn');
+            cnt.textContent = `${mergeConfig.length} group${mergeConfig.length !== 1 ? 's' : ''}`;
+            ab.disabled = mergeConfig.length === 0;
+            if (!mergeConfig.length) { el.innerHTML = `<div class="mempty">no groups yet</div>`; return; }
             el.innerHTML = mergeConfig.map((g, i) => `
-                <div class="merge-group">
-                    <span class="merge-group-name">${esc(g.col_final)}</span>
-                    <span class="merge-group-arrow">←</span>
-                    <span class="merge-group-sources">${g.fuentes.map(esc).join(' + ')}</span>
-                    <span class="merge-group-tb">tb: ${esc(g.tiebreaker)}</span>
-                    <button onclick="removeGroup(${i})" style="font-size:10px;padding:2px 7px">✕</button>
-                </div>
-            `).join('');
+        <div class="merge-group">
+            <span class="mg-name">${esc(g.col_final)}</span>
+            <span style="color:var(--color-text-secondary);font-size:10px">←</span>
+            <span class="mg-src">${g.fuentes.map(esc).join(' + ')}</span>
+            <span class="mg-tb">tb: ${esc(g.tiebreaker)}</span>
+            <button onclick="removeGroup(${i})" style="font-size:10px;padding:2px 7px">✕</button>
+        </div>`).join('');
         }
-
         async function applyMerges() {
-            if (!sel || mergeConfig.length === 0) return;
-
-            const targetTable = document.getElementById('merge-target-table').value.trim();
-            if (!targetTable) {
-                alert('specify a target table (e.g. mapping.players_unified_merged)');
-                return;
-            }
-
-            const applyBtn = document.getElementById('apply-btn');
-            applyBtn.disabled = true;
-            applyBtn.textContent = 'saving…';
-            setResult('merge-result', `<div class="tt-result-hdr"><span class="spinning">◌</span> applying merge…</div>`);
-
+            if (!sel || !mergeConfig.length) return;
+            const tt = document.getElementById('merge-target-table').value.trim();
+            if (!tt) { alert('specify a target table'); return; }
+            const ab = document.getElementById('apply-btn'); ab.disabled = true; ab.textContent = 'saving…';
+            setResult('merge-result', `<div class="tt-result-hdr"><span class="spinning">◌</span> applying…</div>`);
             try {
-                const r = await fetch(`/merge/apply/${sel}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ config: mergeConfig, target_table: targetTable })
-                });
-                const data = await r.json();
-                if (data.error) throw new Error(data.error);
-                setResult('merge-result', `
-                    <div class="tt-result-hdr"><span class="ok">✓ saved as ${targetTable}</span></div>
-                    <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px">
-                        ${data.rows} rows &nbsp;·&nbsp; ${data.cols.length} columns
-                        <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">
-                            ${mergeConfig.map(g => `<span class="badge" style="background:rgba(224,123,57,.1);color:#e07b39">${esc(g.col_final)}</span>`).join('')}
-                        </div>
-                    </div>`);
+                const r = await fetch(`/merge/apply/${sel}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ config: mergeConfig, target_table: tt }) });
+                const data = await r.json(); if (data.error) throw new Error(data.error);
+                setResult('merge-result', `<div class="tt-result-hdr"><span class="ok">✓ saved as ${tt}</span></div>
+            <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px">${data.rows} rows · ${data.cols.length} cols</div>`);
                 loadTables();
-            } catch (e) {
-                setResult('merge-result', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`);
-            } finally {
-                applyBtn.disabled = false;
-                applyBtn.textContent = 'apply & save';
-            }
+            } catch (e) { setResult('merge-result', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`); }
+            finally { ab.disabled = false; ab.textContent = 'apply & save'; }
         }
 
-        // ── Time Travel UI ─────────────────────────────────────────────────────────
-
-        function renderTimeTravel(d) {
-            const snapOpts = d.snaps.map(s => `<option value="${s.id}">[${s.ts}] ${s.id} ${s.current ? '← current' : ''}</option>`).join('');
-            return `
-            <div class="tt-modes">
-                <button class="tt-mode-btn on" onclick="ttMode('read',this)">read version</button>
-                <button class="tt-mode-btn" onclick="ttMode('rollback',this)">rollback</button>
-                <button class="tt-mode-btn" onclick="ttMode('changes',this)">incremental changes</button>
-            </div>
-
-            <!-- ── PANEL: read version ── -->
-            <div class="tt-panel on" id="tt-read">
-                <div class="tt-row">
-                    <span class="tt-label">by</span>
-                    <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer">
-                        <input type="radio" name="tt-read-mode" value="snapshot" checked onchange="ttReadModeChange(this)"> snapshot id
-                    </label>
-                    <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer">
-                        <input type="radio" name="tt-read-mode" value="timestamp" onchange="ttReadModeChange(this)"> timestamp
-                    </label>
-                </div>
-                <div class="tt-row" id="tt-read-snap-row">
-                    <span class="tt-label">snapshot</span>
-                    <select id="tt-read-snap" style="flex:1;max-width:360px">${snapOpts}</select>
-                </div>
-                <div class="tt-row" id="tt-read-ts-row" style="display:none">
-                    <span class="tt-label">datetime</span>
-                    <input type="datetime-local" id="tt-read-ts" style="flex:1;max-width:280px">
-                </div>
-                <div class="tt-row">
-                    <span class="tt-label">limit</span>
-                    <input type="number" id="tt-read-limit" value="50" style="width:70px">
-                    <button class="tt-btn-info" onclick="doReadVersion()">load preview</button>
-                </div>
-                <div class="tt-result" id="tt-read-result"></div>
-            </div>
-
-            <!-- ── PANEL: rollback ── -->
-            <div class="tt-panel" id="tt-rollback">
-                <div class="warn-box">
-                    ⚠ rollback cambia el snapshot actual de la tabla. esta operacion no se puede deshacer desde la UI.
-                </div>
-                <div class="tt-row">
-                    <span class="tt-label">by</span>
-                    <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer">
-                        <input type="radio" name="tt-rb-mode" value="snapshot" checked onchange="ttRbModeChange(this)"> snapshot id
-                    </label>
-                    <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer">
-                        <input type="radio" name="tt-rb-mode" value="timestamp" onchange="ttRbModeChange(this)"> timestamp
-                    </label>
-                </div>
-                <div id="tt-rb-snap-row" class="tt-row">
-                    <span class="tt-label">target</span>
-                    <select id="tt-rb-snap" style="flex:1;max-width:360px">${snapOpts}</select>
-                </div>
-                <div id="tt-rb-ts-row" class="tt-row" style="display:none">
-                    <span class="tt-label">datetime</span>
-                    <input type="datetime-local" id="tt-rb-ts" style="flex:1;max-width:280px">
-                </div>
-                <div class="tt-row">
-                    <button class="tt-btn-danger" onclick="doRollback()">rollback table</button>
-                </div>
-                <div class="tt-result" id="tt-rb-result"></div>
-            </div>
-
-            <!-- ── PANEL: incremental changes ── -->
-            <div class="tt-panel" id="tt-changes">
-                <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:12px">
-                    muestra los registros añadidos entre dos snapshots.
-                </div>
-                <div class="tt-row">
-                    <span class="tt-label">from snap</span>
-                    <select id="tt-ch-from" style="flex:1;max-width:320px">${snapOpts}</select>
-                </div>
-                <div class="tt-row">
-                    <span class="tt-label">to snap</span>
-                    <select id="tt-ch-to" style="flex:1;max-width:320px">${snapOpts}</select>
-                </div>
-                <div class="tt-row">
-                    <span class="tt-label">limit</span>
-                    <input type="number" id="tt-ch-limit" value="200" style="width:70px">
-                    <button class="tt-btn-info" onclick="doChanges()">compute changes</button>
-                </div>
-                <div class="tt-result" id="tt-ch-result"></div>
-            </div>`;
-        }
-
-        // ── Time Travel mode toggle ────────────────────────────────────────────────
-
-        function ttMode(m, el) {
-            document.querySelectorAll('.tt-mode-btn').forEach(b => b.classList.remove('on'));
-            el.classList.add('on');
-            document.querySelectorAll('.tt-panel').forEach(p => p.classList.remove('on'));
-            document.getElementById('tt-' + m).classList.add('on');
-        }
-
-        function ttReadModeChange(el) {
-            const bySnap = el.value === 'snapshot';
-            document.getElementById('tt-read-snap-row').style.display = bySnap ? '' : 'none';
-            document.getElementById('tt-read-ts-row').style.display = bySnap ? 'none' : '';
-        }
-        function ttRbModeChange(el) {
-            const bySnap = el.value === 'snapshot';
-            document.getElementById('tt-rb-snap-row').style.display = bySnap ? '' : 'none';
-            document.getElementById('tt-rb-ts-row').style.display = bySnap ? 'none' : '';
-        }
-
-        // ── API helpers ────────────────────────────────────────────────────────────
-
-        function setResult(id, html) { document.getElementById(id).innerHTML = html; }
+        /* ── API helpers ── */
+        function setResult(id, html) { const e = document.getElementById(id); if (e) e.innerHTML = html; }
         function spin(id) { setResult(id, `<div class="tt-result-hdr"><span class="spinning">◌</span> loading…</div>`); }
+        function dtMs(id) { const v = document.getElementById(id).value; return v ? new Date(v).getTime() : null; }
+
         function resultTable(data) {
             if (!data.rows || !data.rows.length) return `<div style="font-size:12px;color:var(--color-text-secondary);margin-top:8px">no rows returned</div>`;
-            const cols = data.columns || Object.keys(data.rows[0]);
-            const displayCols = cols.filter(c => !c.startsWith('__'));
-            const ths = displayCols.map(c => `<th>${c}</th>`).join('');
+            const cols = (data.columns || Object.keys(data.rows[0])).filter(c => !c.startsWith('__'));
+            const ths = cols.map(c => `<th>${c}</th>`).join('');
             const trs = data.rows.map(row => {
-                const changeType = row['__change_type'] || 'normal';
-                let rowClass = '';
-                if (changeType === 'added') rowClass = ' class="row-added"';
-                else if (changeType === 'removed') rowClass = ' class="row-removed"';
-
-                return `<tr${rowClass}>${displayCols.map(c => {
-                    const v = row[c]; return v === null ? `<td><span class="null">null</span></td>` : `<td>${esc(String(v))}</td>`;
-                }).join('')}</tr>`;
+                const ct = row['__change_type'] || 'normal';
+                const cls = ct === 'added' ? ' class="row-added"' : ct === 'removed' ? ' class="row-removed"' : '';
+                return `<tr${cls}>${cols.map(c => { const v = row[c]; return v === null ? `<td><span class="null">null</span></td>` : `<td>${esc(String(v))}</td>`; }).join('')}</tr>`;
             }).join('');
-            const trunc = data.truncated ? `<div style="font-size:11px;color:var(--color-text-warning);margin-top:6px">⚠ resultado truncado a ${data.rows.length} filas</div>` : '';
+            const trunc = data.truncated ? `<div style="font-size:11px;color:var(--color-text-warning);margin-top:6px">⚠ truncado a ${data.rows.length} filas</div>` : '';
             return `<div style="overflow-x:auto"><table class="dtbl"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>${trunc}`;
         }
-        function dtLocalToMs(id) {
-            const v = document.getElementById(id).value;
-            if (!v) return null;
-            return new Date(v).getTime();
-        }
 
-        // ── Actions ────────────────────────────────────────────────────────────────
-
+        /* ── TT actions ── */
         async function doReadVersion() {
-            if (!sel) return;
-            spin('tt-read-result');
-            const bySnap = document.querySelector('input[name="tt-read-mode"]:checked').value === 'snapshot';
+            if (!sel) return; spin('tt-read-result');
+            const bySnap = document.querySelector('input[name="tt-rm"]:checked').value === 'snapshot';
             const limit = document.getElementById('tt-read-limit').value || 50;
             try {
-                let url, data;
-                if (bySnap) {
-                    const snap_id = document.getElementById('tt-read-snap').value;
-                    url = `/tt/read-snapshot/${sel}?snapshot_id=${snap_id}&limit=${limit}`;
-                } else {
-                    const ts_ms = dtLocalToMs('tt-read-ts');
-                    if (!ts_ms) return setResult('tt-read-result', '<span style="color:var(--color-text-danger);font-size:12px">selecciona un datetime</span>');
-                    url = `/tt/read-timestamp/${sel}?timestamp_ms=${ts_ms}&limit=${limit}`;
-                }
-                const r = await fetch(url); data = await r.json();
-                if (data.error) throw new Error(data.error);
-                const meta = bySnap
-                    ? `snapshot <b>${data.snapshot_id}</b>`
-                    : `snapshot <b>${data.resolved_snapshot_id}</b> — resuelto para ${data.resolved_ts}`;
-                setResult('tt-read-result', `
-            <div class="tt-result-hdr">resultado · ${meta} <span class="ok">✓ ${data.total} filas</span></div>
-            ${resultTable(data)}`);
-            } catch (e) {
-                setResult('tt-read-result', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`);
-            }
+                let url = bySnap
+                    ? `/tt/read-snapshot/${sel}?snapshot_id=${document.getElementById('tt-read-snap').value}&limit=${limit}`
+                    : (() => { const ts = dtMs('tt-read-ts'); if (!ts) throw new Error('selecciona un datetime'); return `/tt/read-timestamp/${sel}?timestamp_ms=${ts}&limit=${limit}`; })();
+                const r = await fetch(url); const data = await r.json(); if (data.error) throw new Error(data.error);
+                const meta = bySnap ? `snapshot <b>${data.snapshot_id}</b>` : `snapshot <b>${data.resolved_snapshot_id}</b> — ${data.resolved_ts}`;
+                setResult('tt-read-result', `<div class="tt-result-hdr">resultado · ${meta} <span class="ok">✓ ${data.total} filas</span></div>${resultTable(data)}`);
+            } catch (e) { setResult('tt-read-result', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`); }
         }
 
         async function doDeleteTable() {
-            if (!sel) return;
-            if (!confirm(`¿Seguro que quieres borrar la tabla '${sel}'? Esta accion elimina metadatos y datos de la tabla.`)) return;
-
+            if (!sel || !confirm(`¿Borrar '${sel}'?`)) return;
             spin('tbl-del-result');
             try {
-                const r = await fetch(`/table/delete/${sel}`, { method: 'POST' });
-                const data = await r.json();
+                const r = await fetch(`/table/delete/${sel}`, { method: 'POST' }); const data = await r.json();
                 if (data.error) throw new Error(data.error);
-
-                setResult('tbl-del-result', `
-            <div class="tt-result-hdr"><span class="ok">✓ tabla borrada</span></div>
-            <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px">
-                comando servidor: <b style="color:var(--color-text-primary)">${esc(data.server_command || '—')}</b><br>
-                audit_log: <b style="color:${data.audit_logged ? 'var(--color-text-success)' : 'var(--color-text-warning)'}">${data.audit_logged ? 'registrado' : 'no disponible'}</b>
-            </div>`);
-
-                sel = null;
-                document.getElementById('tabs').style.display = 'none';
-                document.getElementById('content').innerHTML = `<div class="empty"><span>table deleted</span></div>`;
+                setResult('tbl-del-result', `<div class="tt-result-hdr"><span class="ok">✓ borrada</span></div>
+            <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px">cmd: <b>${esc(data.server_command || '—')}</b></div>`);
+                sel = null; document.getElementById('sub-tabs').style.display = 'none';
+                document.getElementById('sub-content').innerHTML = `<div class="empty"><span>table deleted</span></div>`;
                 await loadTables();
-            } catch (e) {
-                setResult('tbl-del-result', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`);
-            }
+            } catch (e) { setResult('tbl-del-result', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`); }
         }
 
         async function doRollback() {
-            if (!sel) return;
-            spin('tt-rb-result');
-            const bySnap = document.querySelector('input[name="tt-rb-mode"]:checked').value === 'snapshot';
-            if (!confirm(`¿Seguro que quieres hacer rollback de '${sel}'? Esta acción cambiará el snapshot actual.`)) {
-                return setResult('tt-rb-result', '');
-            }
+            if (!sel) return; spin('tt-rb-result');
+            if (!confirm(`¿Rollback de '${sel}'?`)) return setResult('tt-rb-result', '');
+            const bySnap = document.querySelector('input[name="tt-rbm"]:checked').value === 'snapshot';
             try {
-                let r, data;
-                if (bySnap) {
-                    const snap_id = document.getElementById('tt-rb-snap').value;
-                    r = await fetch(`/tt/rollback-snapshot/${sel}`, {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ snapshot_id: snap_id })
-                    });
-                } else {
-                    const ts_ms = dtLocalToMs('tt-rb-ts');
-                    if (!ts_ms) return setResult('tt-rb-result', '<span style="color:var(--color-text-danger);font-size:12px">selecciona un datetime</span>');
-                    r = await fetch(`/tt/rollback-timestamp/${sel}`, {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ timestamp_ms: ts_ms })
-                    });
+                let r;
+                if (bySnap) r = await fetch(`/tt/rollback-snapshot/${sel}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ snapshot_id: document.getElementById('tt-rb-snap').value }) });
+                else {
+                    const ts = dtMs('tt-rb-ts'); if (!ts) return setResult('tt-rb-result', '<span style="color:var(--color-text-danger);font-size:12px">selecciona un datetime</span>');
+                    r = await fetch(`/tt/rollback-timestamp/${sel}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ timestamp_ms: ts }) });
                 }
-                data = await r.json();
-                if (data.error) throw new Error(data.error);
-                setResult('tt-rb-result', `
-            <div class="tt-result-hdr"><span class="ok">✓ rollback completado</span></div>
-            <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px">
-                anterior: <b style="color:var(--color-text-primary)">${data.previous_snapshot_id}</b>
-                &nbsp;→&nbsp; nuevo: <b style="color:var(--color-text-success)">${data.new_snapshot_id}</b>
-                ${data.resolved_ts ? `<br>resuelto para: ${data.resolved_ts}` : ''}
-            </div>`);
+                const data = await r.json(); if (data.error) throw new Error(data.error);
+                setResult('tt-rb-result', `<div class="tt-result-hdr"><span class="ok">✓ rollback completado</span></div>
+            <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px">${data.previous_snapshot_id} → <b style="color:var(--color-text-success)">${data.new_snapshot_id}</b></div>`);
                 pick(sel);
-            } catch (e) {
-                setResult('tt-rb-result', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`);
-            }
+            } catch (e) { setResult('tt-rb-result', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`); }
         }
 
         async function doChanges() {
-            if (!sel) return;
-            spin('tt-ch-result');
-            const from_id = document.getElementById('tt-ch-from').value;
-            const to_id = document.getElementById('tt-ch-to').value;
-            const limit = document.getElementById('tt-ch-limit').value || 200;
-            if (from_id === to_id) return setResult('tt-ch-result', '<span style="font-size:12px;color:var(--color-text-warning)">elige snapshots diferentes</span>');
+            if (!sel) return; spin('tt-ch-result');
+            const from = document.getElementById('tt-ch-from').value, to = document.getElementById('tt-ch-to').value, limit = document.getElementById('tt-ch-limit').value || 200;
+            if (from === to) return setResult('tt-ch-result', '<span style="font-size:12px;color:var(--color-text-warning)">elige snapshots diferentes</span>');
             try {
-                const r = await fetch(`/tt/changes/${sel}?start_snapshot_id=${from_id}&end_snapshot_id=${to_id}&limit=${limit}`);
-                const data = await r.json();
-                if (data.error) throw new Error(data.error);
-                const addedDisplay = data.added_records > 0 ? `<span style="color:var(--color-text-success)">+ ${data.added_records}</span>` : '';
-                const removedDisplay = data.removed_records > 0 ? `<span style="color:var(--color-text-danger)">− ${data.removed_records}</span>` : '';
-                const separator = (data.added_records > 0 && data.removed_records > 0) ? ' · ' : '';
-                setResult('tt-ch-result', `
-            <div class="tt-result-hdr">
-                <span>${from_id}</span> → <span>${to_id}</span>
-                <span class="ok">${addedDisplay}${separator}${removedDisplay}</span>
-            </div>
-            ${resultTable(data)}`);
-            } catch (e) {
-                setResult('tt-ch-result', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`);
-            }
+                const r = await fetch(`/tt/changes/${sel}?start_snapshot_id=${from}&end_snapshot_id=${to}&limit=${limit}`);
+                const data = await r.json(); if (data.error) throw new Error(data.error);
+                const a = data.added_records > 0 ? `<span style="color:var(--color-text-success)">+ ${data.added_records}</span>` : '';
+                const rm = data.removed_records > 0 ? `<span style="color:var(--color-text-danger)">− ${data.removed_records}</span>` : '';
+                setResult('tt-ch-result', `<div class="tt-result-hdr">${from} → ${to} <span class="ok">${a}${a && rm ? ' · ' : ''}${rm}</span></div>${resultTable(data)}`);
+            } catch (e) { setResult('tt-ch-result', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`); }
         }
 
-        // ── Connect ────────────────────────────────────────────────────────────────
-
+        /* ── Connect ── */
         function showOv() { document.getElementById('ov').classList.add('on'); }
         function closeOv() { document.getElementById('ov').classList.remove('on'); }
 
         async function doConnect() {
-            const ep = document.getElementById('f-ep').value;
-            const ak = document.getElementById('f-ak').value;
-            const sk = document.getElementById('f-sk').value;
-            const bk = document.getElementById('f-bk').value;
-            const wp = document.getElementById('f-wp').value;
+            const ep = document.getElementById('f-ep').value, ak = document.getElementById('f-ak').value,
+                sk = document.getElementById('f-sk').value, bk = document.getElementById('f-bk').value,
+                wp = document.getElementById('f-wp').value;
             const ep_s3 = ep.replace(/localhost:8181/, '172.16.58.11:31224').replace(/:32688/, ':31224');
             try {
-                const r = await fetch('/connect', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ep, ep_s3, ak, sk, bk, wp })
-                });
+                const r = await fetch('/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ep, ep_s3, ak, sk, bk, wp }) });
                 const data = await r.json();
-                if (r.ok && data.status === 'ok') {
-                    document.getElementById('dot').style.background = '#1D9E75';
-                    document.getElementById('clbl').textContent = 'connected';
-                    closeOv(); loadTables();
-                } else { alert('Connection failed: ' + (data.msg || 'unknown error')); }
+                if (r.ok && data.status === 'ok') { document.getElementById('dot').style.background = '#1D9E75'; document.getElementById('clbl').textContent = 'connected'; closeOv(); loadTables(); }
+                else alert('Connection failed: ' + (data.msg || 'unknown error'));
             } catch (e) { alert('Connection failed: ' + e.message); }
         }
 
+        /* ── Init ── */
+        renderApiGrid();
         renderSidebar();
     </script>
 </body>
