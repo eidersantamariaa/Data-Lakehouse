@@ -2,9 +2,10 @@
 import pandas as pd
 import json
 import math
+import re
 from rapidfuzz import process, fuzz
 from ingesta import get_spark
-from funciones_mapeo import extraer_inicial_apellido, generar_clave
+from funciones_mapeo import extraer_inicial_apellido, generar_clave, quitar_tildes
 
 spark = get_spark()
 
@@ -17,6 +18,38 @@ def clave_solo_anio(nombre, fecha):
     anio = str(fecha)[:4] if fecha else ""
     inicial, apellido = extraer_inicial_apellido(nombre)
     return f"{inicial}{apellido}{anio}"  # → OSancet2000
+
+
+# --- Funciones de clave específicas para equipos --------------------------------
+def _normalize_team_name_for_key(nombre_raw: str) -> str:
+    if not nombre_raw:
+        return ""
+    s = quitar_tildes(str(nombre_raw)).lower()
+    # eliminar tokens comunes (fc, cf, sc, ac, club, the, de, del, etc.)
+    s = re.sub(r"\b(fc|cf|sc|ac|club|the|de|del|str|team)\b", "", s)
+    # eliminar todo lo que no sea alfanumérico
+    s = re.sub(r"[^a-z0-9]+", "", s)
+    return s.upper()
+
+
+def clave_equipo_fecha(nombre, fecha):
+    """Genera clave para equipos usando nombre normalizado + año (si existe).
+
+    - `fecha` puede ser año o fecha; se extrae el primer grupo de 4 dígitos si existe.
+    """
+    name_key = _normalize_team_name_for_key(nombre)
+    year = ""
+    if fecha:
+        m = re.search(r"(\d{4})", str(fecha))
+        if m:
+            year = m.group(1)
+    return f"{name_key}{year}"
+
+
+def clave_equipo_solo_anio(nombre, fecha):
+    anio = str(fecha)[:4] if fecha else ""
+    name_key = _normalize_team_name_for_key(nombre)
+    return f"{name_key}{anio}"
 
 def generar_mapeo(*fuentes, umbral=85):
     """
