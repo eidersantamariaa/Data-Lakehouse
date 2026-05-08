@@ -72,8 +72,9 @@ def generar_mapeo(*fuentes, umbral=85):
     dfs_con_clave = []
     for df, col_nombre, col_fecha, col_id, prefijo, fn_clave, umbral in fuentes:
         df = df.copy()
+        # Usar .get para tolerar columnas ausentes (p. ej. sin fecha)
         df['_clave'] = df.apply(
-            lambda r, fn=fn_clave, cn=col_nombre, cf=col_fecha: fn(r[cn], r[cf]), axis=1
+            lambda r, fn=fn_clave, cn=col_nombre, cf=col_fecha: fn(r.get(cn, None), r.get(cf, None)), axis=1
         )
         id_col = col_id if col_id else '_clave'
         dfs_con_clave.append((df, id_col, prefijo))
