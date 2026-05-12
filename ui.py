@@ -322,6 +322,7 @@ async def ingesta(req: Request):
                     # fbref bronce módulo hace la ingesta directamente
                     print("📝 Importing fbref_bronce module (ejecuta ingesta directamente)...")
                     import fbref_bronce
+                    fbref_bronce.get_data(namespace)
                     print(f"✅ API fbref ingested successfully")
                     results[api] = {
                         "status": "ok",

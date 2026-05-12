@@ -104,7 +104,7 @@ def getTeams():
             for col in teams.columns
         ]
 
-        full_table = "players.fbref.teams"
+        full_table = f"players.{namespace}.teams"
 
         df_new = spark.createDataFrame(teams.reset_index())
         
@@ -153,7 +153,7 @@ def getTeams():
                 WHEN NOT MATCHED THEN INSERT ({insert_cols}) VALUES ({insert_vals})
             """)
 
-def getPlayers():
+def getPlayers(namespace):
     types = ['standard', 'keeper', 'shooting', 'playing_time', 'misc']
 
     fbref = sd.FBref(leagues=['Big 5 European Leagues Combined'])
@@ -184,7 +184,7 @@ def getPlayers():
             for col in players.columns
         ]
 
-        full_table = "players.fbref.players"
+        full_table = f"players.{namespace}.players"
 
         players = players.reset_index()
 
@@ -274,24 +274,6 @@ def getPlayers():
                 WHEN NOT MATCHED THEN INSERT ({insert_cols}) VALUES ({insert_vals})
             """)
 
-def get_data():
-    getTeams()
-    getPlayers()
-
-fbref = sd.FBref(leagues=['Big 5 European Leagues Combined'])
-players = fbref.read_player_season_stats(stat_type='playing_time').reset_index()
-
-dupes = (
-    players.groupby(["player", "team", "season"])
-    .size()
-    .reset_index(name="count")
-    .query("count > 1")
-)
-
-ejemplo = dupes.iloc[0]
-mask = (
-    (players["player"] == ejemplo["player"]) &
-    (players["team"]   == ejemplo["team"])   &
-    (players["season"] == ejemplo["season"])
-)
-print(players[mask].to_string())
+def get_data(namespace):
+    getTeams(namespace)
+    getPlayers(namespace)
