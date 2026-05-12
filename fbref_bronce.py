@@ -256,7 +256,7 @@ def getPlayers():
 
             df_new.createOrReplaceTempView("incoming_players")
 
-            merge_keys = {"player", "team", "season"}
+            merge_keys = {"player", "team", "season", "born"}
             update_set = ", ".join(
                 [f"target.{c} = source.{c}" for c in df_new.columns if c not in merge_keys]
             )
@@ -266,7 +266,7 @@ def getPlayers():
             spark.sql(f"""
                 MERGE INTO {full_table} AS target
                 USING incoming_players AS source
-                ON target.player = source.player AND target.team = source.team AND target.season = source.season
+                ON target.player = source.player AND target.team = source.team AND target.season = source.season AND target.born   = source.born
                 WHEN MATCHED AND (
                     {" OR ".join([f"target.{c} <> source.{c} OR (target.{c} IS NULL AND source.{c} IS NOT NULL)"
                                     for c in df_new.columns if c not in merge_keys])}
@@ -278,4 +278,20 @@ def get_data():
     getTeams()
     getPlayers()
 
-get_data()
+fbref = sd.FBref(leagues=['Big 5 European Leagues Combined'])
+players = fbref.read_player_season_stats(stat_type='playing_time').reset_index()
+
+dupes = (
+    players.groupby(["player", "team", "season"])
+    .size()
+    .reset_index(name="count")
+    .query("count > 1")
+)
+
+ejemplo = dupes.iloc[0]
+mask = (
+    (players["player"] == ejemplo["player"]) &
+    (players["team"]   == ejemplo["team"])   &
+    (players["season"] == ejemplo["season"])
+)
+print(players[mask].to_string())

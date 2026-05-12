@@ -219,7 +219,7 @@ def validar_fecha(v):
                 return None, f"Mes inválido: {v}"
             if not (1 <= d.day <= 31):
                 return None, f"Día inválido: {v}"
-            if d.year < 1940 or d.year > 2015:
+            if d.year < 1940 or d.year > 2050:
                 return None, f"Año fuera de rango para jugador: {v}"
             return str(v), None
         except:
