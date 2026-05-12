@@ -73,7 +73,7 @@ def get_spark():
 spark = get_spark()
 spark.sql(f"CREATE NAMESPACE IF NOT EXISTS players.fbref")
 
-def getTeams():
+def getTeams(namespace):
     types = ['standard', 'keeper', 'shooting', 'playing_time', 'misc']
 
     fbref = sd.FBref(leagues=['Big 5 European Leagues Combined'])
