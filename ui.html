@@ -326,6 +326,112 @@
             padding: 20px 24px;
         }
 
+        /* ── Matching ── */
+        .matching-layout {
+            flex: 1;
+            overflow: auto;
+            padding: 20px 24px;
+        }
+
+        .matching-head {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .matching-note {
+            font-size: 11px;
+            color: var(--color-text-secondary);
+            line-height: 1.5;
+            max-width: 720px;
+        }
+
+        .matching-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 10px;
+        }
+
+        .match-card {
+            border: 0.5px solid var(--color-border-secondary);
+            border-radius: var(--border-radius-lg);
+            padding: 14px;
+            background: var(--color-background-primary);
+        }
+
+        .match-card-hdr {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .match-card-title {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--color-text-primary);
+        }
+
+        .match-card-sub {
+            font-size: 11px;
+            color: var(--color-text-secondary);
+            margin-top: 2px;
+        }
+
+        .match-row {
+            display: grid;
+            grid-template-columns: 84px 1fr;
+            gap: 8px;
+            align-items: center;
+            margin-top: 8px;
+        }
+
+        .match-row label {
+            font-size: 11px;
+            color: var(--color-text-secondary);
+        }
+
+        .match-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+        }
+
+        .match-output {
+            margin-top: 16px;
+        }
+
+        .match-output-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .match-panel {
+            border: 0.5px solid var(--color-border-tertiary);
+            border-radius: var(--border-radius-lg);
+            padding: 12px;
+            background: var(--color-background-primary);
+        }
+
+        .match-panel-hdr {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-size: 11px;
+            color: var(--color-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: .07em;
+        }
+
         /* ── Shared ── */
         .badge {
             display: inline-block;
@@ -886,6 +992,13 @@
                     </svg>
                     merge columns
                 </div>
+                <div class="mnav" id="mnav-matching" onclick="switchMain('matching')">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M7 7h10M7 12h10M7 17h10" />
+                        <path d="M4 7h.01M4 12h.01M4 17h.01" />
+                    </svg>
+                    id matching
+                </div>
             </nav>
             <div class="hdr-right">
                 <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--color-text-secondary)">
@@ -951,6 +1064,19 @@
                 </div>
             </div>
 
+            <!-- MATCHING -->
+            <div class="page" id="page-matching">
+                <div class="matching-layout" id="matching-layout">
+                    <div class="empty" style="height:100%">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1" opacity="0.3">
+                            <path d="M4 7h16M4 12h16M4 17h16" />
+                        </svg>
+                        <span>selecciona una configuración de matching</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- MERGE -->
             <div class="page" id="page-merge">
                 <div class="merge-layout" id="merge-layout">
@@ -974,6 +1100,8 @@
         let prevHiddenCols = new Set();
         let mergeConfig = [], allCols = [], selectedManualCols = new Set();
         let selectedAPIs = new Set();
+        let matchingSources = [];
+        let matchingSchemas = {};
 
         const APIS = [
             { id: 'transfermarkt', name: 'Transfermarkt', desc: 'Valores de mercado, fichajes, datos de contrato', tags: ['players', 'transfers'] },
@@ -993,6 +1121,7 @@
             document.getElementById('mnav-' + page).classList.add('on');
             document.getElementById('page-' + page).classList.add('on');
             if (page === 'merge') renderMergeLayout();
+            if (page === 'matching') renderMatchingLayout();
         }
 
         /* ── Ingesta ── */
@@ -1417,6 +1546,236 @@
                 loadTables();
             } catch (e) { setResult('merge-result', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`); }
             finally { ab.disabled = false; ab.textContent = 'apply & save'; }
+        }
+
+        /* ── Matching page ── */
+        function ensureMatchingDefaults() {
+            if (matchingSources.length) return;
+            matchingSources = [
+                { label: 'Transfermarkt', prefix: 'tm', table: '', name_col: '', date_col: '', id_col: '', key_mode: 'full_date', umbral: 88 },
+                { label: 'TheSportsDB', prefix: 'ts', table: '', name_col: '', date_col: '', id_col: '', key_mode: 'full_date', umbral: 88 },
+                { label: 'FBref', prefix: 'fb', table: '', name_col: '', date_col: '', id_col: '', key_mode: 'year', umbral: 75 },
+            ];
+        }
+
+        function getMatchingTables() {
+            return Object.keys(T).sort();
+        }
+
+        function getMatchingSchemaFields(table) {
+            const schema = matchingSchemas[table] || (T[table] && T[table].schema) || [];
+            return schema.map(f => typeof f === 'string' ? f : f.n).filter(Boolean);
+        }
+
+        async function ensureMatchingSchema(table) {
+            if (!table) return [];
+            if (matchingSchemas[table]) return matchingSchemas[table];
+            if (T[table] && T[table].schema && T[table].schema.length) {
+                matchingSchemas[table] = T[table].schema;
+                return matchingSchemas[table];
+            }
+            const r = await fetch(`/schema/${table}`);
+            const data = await r.json();
+            if (data.error) throw new Error(data.error);
+            matchingSchemas[table] = data.schema || [];
+            if (!T[table]) T[table] = {};
+            T[table].schema = matchingSchemas[table];
+            return matchingSchemas[table];
+        }
+
+        function matchingFieldOptions(table, selected) {
+            const fields = getMatchingSchemaFields(table);
+            if (!fields.length) return '<option value="">— select —</option>';
+            return `<option value="">— select —</option>` + fields.map(c => `<option value="${esc(c)}"${c === selected ? ' selected' : ''}>${esc(c)}</option>`).join('');
+        }
+
+        function renderMatchingLayout() {
+            const el = document.getElementById('matching-layout');
+            ensureMatchingDefaults();
+            const cards = matchingSources.map((src, i) => {
+                const table = src.table || '';
+                const tableOptions = `<option value="">— select table —</option>` + getMatchingTables().map(t => `<option value="${esc(t)}"${t === table ? ' selected' : ''}>${esc(t)}</option>`).join('');
+                const fields = getMatchingSchemaFields(table);
+                const hasSchema = fields.length > 0;
+                return `
+            <div class="match-card">
+                <div class="match-card-hdr">
+                    <div>
+                        <div class="match-card-title">Fuente ${i + 1}</div>
+                        <div class="match-card-sub">${esc(src.label)}</div>
+                    </div>
+                    <span class="badge t-ts">${esc(src.prefix || 'src')}</span>
+                </div>
+                <div class="match-row">
+                    <label>prefijo</label>
+                    <input id="ms-prefix-${i}" value="${esc(src.prefix || '')}" onchange="setMatchingSourceField(${i}, 'prefix', this.value)" placeholder="tm" style="width:100%">
+                </div>
+                <div class="match-row">
+                    <label>tabla</label>
+                    <select id="ms-table-${i}" onchange="setMatchingSourceField(${i}, 'table', this.value)" style="width:100%">
+                        ${tableOptions}
+                    </select>
+                </div>
+                <div class="match-row">
+                    <label>name</label>
+                    <select id="ms-name-${i}" onchange="setMatchingSourceField(${i}, 'name_col', this.value)" style="width:100%"${hasSchema ? '' : ' disabled'}>
+                        ${matchingFieldOptions(table, src.name_col)}
+                    </select>
+                </div>
+                <div class="match-row">
+                    <label>date</label>
+                    <select id="ms-date-${i}" onchange="setMatchingSourceField(${i}, 'date_col', this.value)" style="width:100%"${hasSchema ? '' : ' disabled'}>
+                        ${matchingFieldOptions(table, src.date_col)}
+                    </select>
+                </div>
+                <div class="match-row">
+                    <label>id</label>
+                    <select id="ms-id-${i}" onchange="setMatchingSourceField(${i}, 'id_col', this.value)" style="width:100%"${hasSchema ? '' : ' disabled'}>
+                        <option value="">— derived key —</option>
+                        ${fields.map(c => `<option value="${esc(c)}"${c === src.id_col ? ' selected' : ''}>${esc(c)}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="match-row">
+                    <label>key mode</label>
+                    <select id="ms-mode-${i}" onchange="setMatchingSourceField(${i}, 'key_mode', this.value)" style="width:100%">
+                        <option value="full_date"${src.key_mode === 'full_date' ? ' selected' : ''}>full date</option>
+                        <option value="year"${src.key_mode === 'year' ? ' selected' : ''}>year only</option>
+                    </select>
+                </div>
+                <div class="match-row">
+                    <label>threshold</label>
+                    <select id="ms-threshold-${i}" onchange="setMatchingSourceField(${i}, 'umbral', parseFloat(this.value))" style="width:100%">
+                        <option value="95"${src.umbral === 95 ? ' selected' : ''}>95%</option>
+                        <option value="90"${src.umbral === 90 ? ' selected' : ''}>90%</option>
+                        <option value="88"${src.umbral === 88 ? ' selected' : ''}>88%</option>
+                        <option value="85"${src.umbral === 85 ? ' selected' : ''}>85%</option>
+                        <option value="75"${src.umbral === 75 ? ' selected' : ''}>75%</option>
+                        <option value="70"${src.umbral === 70 ? ' selected' : ''}>70%</option>
+                    </select>
+                </div>
+            </div>`;
+            }).join('');
+
+            el.innerHTML = `
+        <div class="matching-head">
+            <div>
+                <div style="font-size:13px;font-weight:500;margin-bottom:2px">id matching</div>
+                <div class="matching-note">elige manualmente las tablas y columnas de cada fuente para generar el mapeo y la tabla unificada desde la UI. Si dejas vacío el id de una fuente, el backend construye la clave derivada con nombre + fecha.</div>
+            </div>
+        </div>
+        <div class="match-card" style="margin-bottom:12px">
+            <div class="match-row">
+                <label>threshold</label>
+                <select id="match-umbral" style="width:100%">
+                    <option value="95">strict (95%)</option>
+                    <option value="85" selected>normal (85%)</option>
+                    <option value="70">fuzzy (70%)</option>
+                </select>
+            </div>
+            <div class="match-row">
+                <label>mapping table (namespace.table)</label>
+                <input id="match-mapping-target" value="players.mapping.players_mapping" style="width:100%" placeholder="players.mapping.players_mapping">
+            </div>
+            <div class="match-row">
+                <label>final table (namespace.table)</label>
+                <input id="match-unified-target" value="players.mapping.players_unified" style="width:100%" placeholder="players.mapping.players_unified">
+            </div>
+        </div>
+        <div class="matching-grid">${cards}</div>
+        <div class="match-actions">
+            <button class="btn-success" onclick="runMatching()" id="match-run-btn">generate mapping + table</button>
+            <button onclick="resetMatching()">reset</button>
+        </div>
+        <div class="match-output" id="match-output">
+            <div class="empty" style="height:220px">
+                <span>la salida aparecerá aquí después de ejecutar el matching</span>
+            </div>
+        </div>`;
+        }
+
+        async function setMatchingSourceField(i, field, value) {
+            matchingSources[i][field] = value;
+            if (field === 'table') {
+                matchingSources[i].name_col = '';
+                matchingSources[i].date_col = '';
+                matchingSources[i].id_col = '';
+                if (value) {
+                    try { await ensureMatchingSchema(value); } catch (e) { console.error(e); }
+                }
+            }
+            renderMatchingLayout();
+        }
+
+        function resetMatching() {
+            matchingSources = [];
+            matchingSchemas = {};
+            renderMatchingLayout();
+        }
+
+        function matchingPreviewTable(rows, columns) {
+            return resultTable({ rows, columns });
+        }
+
+        async function runMatching() {
+            const btn = document.getElementById('match-run-btn');
+            const payloadSources = matchingSources.filter(src => src.table && src.name_col && src.prefix).map(src => ({
+                table: src.table,
+                name_col: src.name_col,
+                date_col: src.date_col,
+                id_col: src.id_col,
+                prefix: src.prefix,
+                key_mode: src.key_mode,
+                umbral: src.umbral,
+            }));
+
+            if (payloadSources.length < 2) {
+                alert('elige al menos dos fuentes completas');
+                return;
+            }
+
+            const payload = {
+                sources: payloadSources,
+                umbral: parseFloat(document.getElementById('match-umbral').value || '85'),
+                mapping_table: document.getElementById('match-mapping-target').value.trim(),
+                unified_table: document.getElementById('match-unified-target').value.trim(),
+            };
+
+            btn.disabled = true;
+            btn.textContent = 'working…';
+            setResult('match-output', `<div class="tt-result-hdr"><span class="spinning">◌</span> generating mapping…</div>`);
+            try {
+                const r = await fetch('/matching/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await r.json();
+                if (data.error) throw new Error(data.error);
+
+                const sourceSummary = (data.sources || []).map(s => `<div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px"><b style="color:var(--color-text-primary)">${esc(s.prefix)}</b> → ${esc(s.table)} · ${esc(s.name_col)} · ${esc(s.date_col || '—')} · ${esc(s.id_col || 'derived')}</div>`).join('');
+                const mappingPanel = `<div class="match-panel">
+                    <div class="match-panel-hdr"><span>mapping</span><span>${data.mapping_rows} rows</span></div>
+                    ${matchingPreviewTable(data.mapping_preview || [], data.mapping_columns || [])}
+                    ${data.mapping_saved ? `<div style="font-size:11px;color:var(--color-text-success);margin-top:8px">saved as ${esc(data.mapping_saved.table)}</div>` : ''}
+                </div>`;
+                const unifiedPanel = `<div class="match-panel">
+                    <div class="match-panel-hdr"><span>unified</span><span>${data.unified_rows} rows</span></div>
+                    ${matchingPreviewTable(data.unified_preview || [], data.unified_columns || [])}
+                    ${data.unified_saved ? `<div style="font-size:11px;color:var(--color-text-success);margin-top:8px">saved as ${esc(data.unified_saved.table)}</div>` : ''}
+                </div>`;
+
+                setResult('match-output', `
+                    <div class="tt-result-hdr"><span class="ok">✓ matching completed</span></div>
+                    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:10px">${sourceSummary}</div>
+                    <div class="match-output-grid">${mappingPanel}${unifiedPanel}</div>
+                `);
+                loadTables();
+            } catch (e) {
+                setResult('match-output', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'generate mapping + table';
+            }
         }
 
         /* ── API helpers ── */

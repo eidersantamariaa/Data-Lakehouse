@@ -104,7 +104,7 @@ def run_ingesta(config):
 
     for table_name, records in data.items():
         print(f"Processing {table_name}... ({len(records)} records)")
-        full_table = f"players.{config.NAMESPACE}.{table_name}_bronce"
+        full_table = f"players.{config.NAMESPACE}.{config.API}_{table_name}"
         
         df_new = spark.read.json(
             spark.sparkContext.parallelize([json.dumps(r) for r in records])

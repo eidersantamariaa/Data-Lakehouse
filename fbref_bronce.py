@@ -104,14 +104,13 @@ def getTeams(namespace):
             for col in teams.columns
         ]
 
-        full_table = f"players.{namespace}.teams"
+        full_table = f"players.{namespace}.fbref_teams"
 
         df_new = spark.createDataFrame(teams.reset_index())
         
         # ¿Existe la tabla?
         try:
-            spark.sql(f"SELECT 1 FROM {full_table} LIMIT 1")
-            table_exists = True
+            table_exists = spark.catalog.tableExists(full_table)
         except Exception:
             table_exists = False
 
@@ -184,7 +183,7 @@ def getPlayers(namespace):
             for col in players.columns
         ]
 
-        full_table = f"players.{namespace}.players"
+        full_table = f"players.{namespace}.fbref_players"
 
         players = players.reset_index()
 
@@ -210,7 +209,7 @@ def getPlayers(namespace):
         
         # ¿Existe la tabla?
         try:
-            spark.sql(f"SELECT 1 FROM {full_table} LIMIT 1")
+            table_exists = spark.catalog.tableExists(full_table)
             table_exists = True
         except Exception:
             table_exists = False

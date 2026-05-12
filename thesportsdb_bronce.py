@@ -13,7 +13,7 @@ api_key = 123
 base_url = f"https://www.thesportsdb.com/api/v1/json/{api_key}"
 session = requests.Session()
 
-NAMESPACE = "thesportsdb"  
+API = "thesportsdb"  
 
 def get_data():
     leagues_dict, leagues_list = getBig5()
@@ -95,8 +95,15 @@ def getTeams(big5):
             "Content-Type": "application/json"
         }
         response = session.get(url, headers = headers)
-        team_data = response.json()
-        if not team_data["teams"]:
+        if response.status_code != 200 or not response.text:
+            print(f"⚠️  Skipping team {team_name}: status {response.status_code} or empty response")
+            continue
+        try:
+            team_data = response.json()
+        except Exception as e:
+            print(f"⚠️  Skipping team {team_name}: JSON decode error: {e}")
+            continue
+        if not team_data or not team_data.get("teams"):
             continue
         all_teams.append(team_data["teams"][0])
 
