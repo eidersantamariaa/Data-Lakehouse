@@ -33,7 +33,6 @@ def _resolve_merge_keys(table_name, columns):
         return id_like_columns
 
     return []
-
 def get_spark():
     builder = SparkSession.builder.appName("ingesta")
 
@@ -95,15 +94,15 @@ def get_spark():
     return builder.getOrCreate()
 
 
-def run_ingesta(config):
+def run_ingesta(config, test_mode=False):
     spark = get_spark()
     spark.sql(f"CREATE NAMESPACE IF NOT EXISTS players.{config.NAMESPACE}")
 
-    data = config.get_data()
+    data = config.get_data(test_mode=test_mode)
     processed = []
 
     for table_name, records in data.items():
-        print(f"Processing {table_name}... ({len(records)} records)")
+        print(f"Processing {table_name}... ({len(records)} records{' [test mode]' if test_mode else ''})")
         full_table = f"players.{config.NAMESPACE}.{config.API}_{table_name}"
         
         df_new = spark.read.json(

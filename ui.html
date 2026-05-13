@@ -985,19 +985,19 @@
                     </svg>
                     explorer
                 </div>
-                <div class="mnav merge" id="mnav-merge" onclick="switchMain('merge')">
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path
-                            d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
-                    </svg>
-                    merge columns
-                </div>
                 <div class="mnav" id="mnav-matching" onclick="switchMain('matching')">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M7 7h10M7 12h10M7 17h10" />
                         <path d="M4 7h.01M4 12h.01M4 17h.01" />
                     </svg>
                     id matching
+                </div>
+                <div class="mnav merge" id="mnav-merge" onclick="switchMain('merge')">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path
+                            d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+                    </svg>
+                    limpieza y merge
                 </div>
             </nav>
             <div class="hdr-right">
@@ -1032,6 +1032,10 @@
                             <span style="font-size:11px;color:var(--color-text-secondary)">namespace</span>
                             <input id="ingesta-ns" placeholder="raw" style="width:100px;font-size:11px">
                         </div>
+                        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+                            <input type="checkbox" id="ingesta-test-mode" style="cursor:pointer">
+                            <span style="color:var(--color-text-secondary)">modo test (20%)</span>
+                        </label>
                         <button class="btn-info" id="ingesta-btn" onclick="doIngesta()" disabled>▶ ingestar
                             seleccionadas</button>
                     </div>
@@ -1148,11 +1152,16 @@
         async function doIngesta() {
             const ns = document.getElementById('ingesta-ns').value.trim() || 'raw';
             const apis = [...selectedAPIs];
+            const testMode = document.getElementById('ingesta-test-mode').checked;
             const btn = document.getElementById('ingesta-btn');
             btn.disabled = true; btn.textContent = '◌ ingestando…';
             setResult('ingesta-result', `<div class="tt-result-hdr"><span class="spinning">◌</span> iniciando ingesta de: ${apis.join(', ')}…</div>`);
             try {
-                const r = await fetch('/ingesta', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apis, namespace: ns }) });
+                const r = await fetch('/ingesta', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ apis, namespace: ns, test_mode: testMode })
+                });
                 const data = await r.json();
                 if (data.error) throw new Error(data.error);
                 if (data.status !== 'ok') throw new Error('Ingesta falló');

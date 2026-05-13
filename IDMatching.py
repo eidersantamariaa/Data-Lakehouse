@@ -78,32 +78,50 @@ def generar_mapeo_df(*fuentes, umbral=85):
     dfs_con_clave = _build_source_frames(*fuentes)
 
     df_base, id_base, prefijo_base, _ = dfs_con_clave[0]
-    mapeo = df_base[['_clave', id_base]].rename(columns={id_base: f"id_{prefijo_base}"})
+    base_cols = ['_clave', id_base]
+    mapeo = df_base[base_cols].drop_duplicates(subset='_clave').copy()
+    mapeo = mapeo.rename(columns={id_base: f"id_{prefijo_base}"})
+    mapeo = mapeo.rename(columns={'_clave': 'clave_canonica'})
+    # `id_propio` should be the canonical clave (inicial+apellido+fecha)
+    mapeo['id_propio'] = mapeo['clave_canonica']
+    # keep the source id column for the base prefix
+    mapeo[f'id_{prefijo_base}'] = mapeo[f'id_{prefijo_base}']
 
     for df_other, id_other, prefijo_other, umbral_fuente in dfs_con_clave[1:]:
         umbral_local = umbral_fuente if umbral_fuente is not None else umbral
-        claves_other = df_other['_clave'].tolist()
-
-        def buscar_match(clave):
-            if not clave:
-                return None
-            resultado = process.extractOne(clave, claves_other, scorer=fuzz.ratio)
-            if resultado and resultado[1] >= umbral_local:
-                return resultado[0]
-            return None
-
-        mapeo[f'_clave_{prefijo_other}'] = mapeo['_clave'].apply(buscar_match)
-
-        df_unique = df_other.drop_duplicates(subset='_clave')
+        df_unique = df_other.drop_duplicates(subset='_clave').copy()
         if id_other == '_clave':
-            lookup = pd.Series(df_unique['_clave'].values, index=df_unique['_clave'].values)
+            df_unique[f'id_{prefijo_other}'] = df_unique['_clave']
         else:
-            lookup = df_unique.set_index('_clave')[id_other]
+            df_unique[f'id_{prefijo_other}'] = df_unique[id_other]
 
-        mapeo[f'id_{prefijo_other}'] = mapeo[f'_clave_{prefijo_other}'].map(lookup)
-        mapeo = mapeo.drop(columns=[f'_clave_{prefijo_other}'])
+        if f'id_{prefijo_other}' not in mapeo.columns:
+            mapeo[f'id_{prefijo_other}'] = None
 
-    mapeo = mapeo.rename(columns={'_clave': 'id_propio'})
+        for _, row in df_unique.iterrows():
+            clave = row.get('_clave')
+            if not clave:
+                continue
+
+            matched_key = None
+            if not mapeo.empty:
+                resultado = process.extractOne(clave, mapeo['clave_canonica'].tolist(), scorer=fuzz.ratio)
+                if resultado and resultado[1] >= umbral_local:
+                    matched_key = resultado[0]
+
+            if matched_key is not None:
+                idx = mapeo.index[mapeo['clave_canonica'] == matched_key][0]
+                if pd.isna(mapeo.at[idx, f'id_{prefijo_other}']):
+                    mapeo.at[idx, f'id_{prefijo_other}'] = row[f'id_{prefijo_other}']
+            else:
+                new_row = {col: None for col in mapeo.columns}
+                new_row['clave_canonica'] = clave
+                # use the canonical clave as id_propio for the added row
+                new_row['id_propio'] = clave
+                new_row[f'id_{prefijo_other}'] = row[f'id_{prefijo_other}']
+                mapeo = pd.concat([mapeo, pd.DataFrame([new_row])], ignore_index=True)
+
+    mapeo = mapeo.drop(columns=['clave_canonica'])
     cols = ['id_propio'] + [c for c in mapeo.columns if c != 'id_propio']
     return mapeo[cols]
 

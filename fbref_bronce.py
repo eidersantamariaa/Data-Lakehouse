@@ -73,7 +73,7 @@ def get_spark():
 spark = get_spark()
 spark.sql(f"CREATE NAMESPACE IF NOT EXISTS players.fbref")
 
-def getTeams(namespace):
+def getTeams(namespace, test_mode=False):
     types = ['standard', 'keeper', 'shooting', 'playing_time', 'misc']
 
     fbref = sd.FBref(leagues=['Big 5 European Leagues Combined'])
@@ -103,6 +103,9 @@ def getTeams(namespace):
             f"_{col}" if col[0].isdigit() else col
             for col in teams.columns
         ]
+
+        if test_mode:
+            teams = teams.head(20)
 
         full_table = f"players.{namespace}.fbref_teams"
 
@@ -152,7 +155,7 @@ def getTeams(namespace):
                 WHEN NOT MATCHED THEN INSERT ({insert_cols}) VALUES ({insert_vals})
             """)
 
-def getPlayers(namespace):
+def getPlayers(namespace, test_mode=False):
     types = ['standard', 'keeper', 'shooting', 'playing_time', 'misc']
 
     fbref = sd.FBref(leagues=['Big 5 European Leagues Combined'])
@@ -183,6 +186,9 @@ def getPlayers(namespace):
             for col in players.columns
         ]
 
+        if test_mode:
+            players = players.head(20)
+
         full_table = f"players.{namespace}.fbref_players"
 
         players = players.reset_index()
@@ -210,7 +216,6 @@ def getPlayers(namespace):
         # ¿Existe la tabla?
         try:
             table_exists = spark.catalog.tableExists(full_table)
-            table_exists = True
         except Exception:
             table_exists = False
 
@@ -273,6 +278,6 @@ def getPlayers(namespace):
                 WHEN NOT MATCHED THEN INSERT ({insert_cols}) VALUES ({insert_vals})
             """)
 
-def get_data(namespace):
-    getTeams(namespace)
-    getPlayers(namespace)
+def get_data(namespace, test_mode=False):
+    getTeams(namespace, test_mode=test_mode)
+    getPlayers(namespace, test_mode=test_mode)

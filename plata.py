@@ -48,6 +48,9 @@ def detectar_solapamientos(df, umbral_similitud=0.7):
         except:
             continue
 
+    if not candidatos:
+        return pd.DataFrame(columns=["col1", "col2", "coincidencia"])
+
     return pd.DataFrame(candidatos).sort_values("coincidencia", ascending=False)
 
 def detectar_solapamientos_agrupados(df, umbral_similitud=0.5):

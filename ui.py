@@ -11,6 +11,7 @@ from timetraveling import TimeTraveler
 import math
 
 from IDMatching import generar_mapeo_df, unir_fuentes_df, clave_fecha_completa, clave_solo_anio
+from plata import validar_tabla
 
 
 app = FastAPI()
@@ -104,6 +105,23 @@ def schema(table: str):
         "part": str(t.spec()) or "unpartitioned",
         "loc": t.location(),
     }
+
+
+@app.get("/merge/detect/{table}")
+def merge_detect(table: str, umbral: float = 0.5):
+    if catalog is None:
+        return JSONResponse({"error": "Catalog not connected"}, status_code=400)
+    try:
+        import plata as _plata
+        df = _load_table_df(table)
+        grupos = _plata.detectar_solapamientos_agrupados(df, umbral_similitud=umbral)
+        columnas = list(df.columns)
+        return {"columnas": columnas, "grupos": grupos}
+    except Exception as e:
+        print(f"❌ merge detect error: {e}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({"error": str(e)}, status_code=400)
 
 # ── Preview ahora acepta limit como query param ─────────────────────────────
 @app.get("/preview/{table}")
@@ -396,81 +414,73 @@ def tt_changes(table: str, start_snapshot_id: str, end_snapshot_id: str, limit: 
 async def ingesta(req: Request):
     if catalog is None:
         return JSONResponse({"error": "Catalog not connected"}, status_code=400)
-    
+
     try:
         body = await req.json()
         apis = body.get("apis", [])
-        namespace = body.get("namespace", "raw").strip()
-        
+        namespace = (body.get("namespace", "raw") or "raw").strip() or "raw"
+        test_mode = bool(body.get("test_mode", False))
+
         if not apis:
             return JSONResponse({"error": "No APIs selected"}, status_code=400)
-        
-        if not namespace:
-            namespace = "raw"
-        
-        # Create namespace if not exists
+
         try:
             catalog.create_namespace(namespace)
         except Exception:
-            pass  # Namespace might already exist
-        
+            pass
+
         results = {}
-        
-        # Process each API
+
         for api in apis:
             try:
                 print(f"\n🚀 Starting ingestion for {api}...")
-                
+                print(f"   {'TEST MODE' if test_mode else 'FULL MODE'} - {'20%' if test_mode else '100%'} de datos")
+
                 if api == "fbref":
-                    # fbref bronce módulo hace la ingesta directamente
                     print("📝 Importing fbref_bronce module (ejecuta ingesta directamente)...")
                     import fbref_bronce
-                    fbref_bronce.get_data(namespace)
-                    print(f"✅ API fbref ingested successfully")
+                    fbref_bronce.get_data(namespace, test_mode=test_mode)
                     results[api] = {
                         "status": "ok",
                         "tables": ["teams", "players"],
-                        "count": 2
+                        "count": 2,
                     }
-                    
+                    print("✅ API fbref ingested successfully")
+
                 elif api in ["transfermarkt", "thesportsdb"]:
-                    # transfermarkt y thesportsdb usan run_ingesta
                     print(f"📝 Loading {api} with run_ingesta...")
-                    
                     if api == "transfermarkt":
                         import transfermarkt_bronce as module
-                    else:  # thesportsdb
+                    else:
                         import thesportsdb_bronce as module
-                    
-                    # Create config object for run_ingesta
+
                     class Config:
                         NAMESPACE = namespace
                         API = api
                         get_data = staticmethod(module.get_data)
-                    
-                    # Import and run ingesta
+
                     from ingesta import run_ingesta
-                    ingest_result = run_ingesta(Config)
+
+                    ingest_result = run_ingesta(Config, test_mode=test_mode)
                     tables_created = [entry["table"] for entry in ingest_result.get("tables", [])]
-                    
                     results[api] = {
                         "status": "ok",
                         "tables": tables_created,
-                        "count": len(tables_created)
+                        "count": len(tables_created),
                     }
                     print(f"✅ API {api} ingested successfully ({len(tables_created)} tables)")
-                    
+
                 else:
                     results[api] = {"status": "error", "msg": f"Unknown API: {api}"}
-                    
+
             except Exception as e:
                 print(f"❌ Error ingesting {api}: {e}")
                 import traceback
                 traceback.print_exc()
                 results[api] = {"status": "error", "msg": str(e)}
-        
+
         return {"status": "ok", "results": results}
-    
+
     except Exception as e:
         print(f"❌ Ingesta error: {e}")
         import traceback
@@ -481,85 +491,7 @@ async def ingesta(req: Request):
 @app.get("/", response_class=HTMLResponse)
 async def root():
     with open("ui.html") as f:
-        return f.read()
-
-@app.get("/merge/detect/{table}")
-def detect_merges(table: str, umbral: float = 0.5):
-    if catalog is None:
-        return JSONResponse({"error": "Catalog not connected"}, status_code=400)
-    try:
-        ns, tbl_name = table.split(".", 1)
-        t = catalog.load_table((ns, tbl_name))
-        df = t.scan().to_arrow().to_pandas()
-
-        from plata import detectar_solapamientos_agrupados
-        grupos = detectar_solapamientos_agrupados(df, umbral)
-
-        return {
-            "grupos": grupos,
-            "columnas": df.columns.tolist()
-        }
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=400)
-
-
-@app.post("/merge/apply/{table}")
-async def apply_merges(table: str, req: Request):
-    if catalog is None:
-        return JSONResponse({"error": "Catalog not connected"}, status_code=400)
-    try:
-        body = await req.json()
-        ns, tbl_name = table.split(".", 1)
-        t = catalog.load_table((ns, tbl_name))
-        df = t.scan().to_arrow().to_pandas()
-
-        from plata import limpiar_tabla
-
-        config = [
-            {
-                "col_final":  e["col_final"],
-                "fuentes":    e["fuentes"],
-                "tiebreaker": e["tiebreaker"],
-                "normalizar": lambda x: x,
-            }
-            for e in body["config"]
-        ]
-
-        tabla_limpia = limpiar_tabla(df, config=config, config_norm=[], usar_fuzzy=False)
-
-        target_table = body.get("target_table", f"{ns}.{tbl_name}_merged")
-        target_ns, target_tbl = target_table.split(".", 1)
-
-        arrow_table = pa.Table.from_pandas(tabla_limpia)
-
-        try:
-            catalog.create_table(
-                (target_ns, target_tbl),
-                schema=arrow_table.schema,
-            )
-            print(f"✅ tabla creada: {target_table}")
-        except Exception as create_err:
-            print(f"⚠ tabla ya existe o error: {create_err}, sobrescribiendo...")
-
-        target_t = catalog.load_table((target_ns, target_tbl))
-        target_t.overwrite(arrow_table)
-
-        audit_written = _write_audit_log(
-            namespace=target_ns,
-            table_name=target_tbl,
-            accion="MERGE",
-            num_registros=len(tabla_limpia),
-        )
-
-        return {
-            "status": "ok",
-            "table": target_table,
-            "rows": len(tabla_limpia),
-            "cols": tabla_limpia.columns.tolist(),
-            "audit_logged": audit_written,
-        }
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=400)
+        return HTMLResponse(f.read())
 
 
 @app.post("/matching/run")

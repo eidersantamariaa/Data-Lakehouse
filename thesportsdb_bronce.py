@@ -15,10 +15,10 @@ session = requests.Session()
 
 API = "thesportsdb"  
 
-def get_data():
-    leagues_dict, leagues_list = getBig5()
-    teams_dict, teams_list = getTeams(leagues_dict)
-    players_list = getPlayers(teams_dict)
+def get_data(test_mode=False):
+    leagues_dict, leagues_list = getBig5(test_mode=test_mode)
+    teams_dict, teams_list = getTeams(leagues_dict, test_mode=test_mode)
+    players_list = getPlayers(teams_dict, test_mode=test_mode)
 
     return {
         "leagues": leagues_list,
@@ -26,7 +26,7 @@ def get_data():
         "players": players_list
     }
 
-def getBig5():
+def getBig5(test_mode=False):
     print("Getting Big 5 Leagues...")
     url = f"https://www.thesportsdb.com/api/v1/json/{api_key}/all_leagues.php"
     headers = {
@@ -64,7 +64,7 @@ def getBig5():
     print("Big 5 Leagues retrieved successfully")
     return big5, all_leagues
 
-def getTeams(big5):
+def getTeams(big5, test_mode=False):
     print("Getting Teams...")
     teams = {}
     all_teams = []
@@ -81,7 +81,9 @@ def getTeams(big5):
         if not data["teams"]:
             continue
         
-        for team in data["teams"]:
+        league_teams = data["teams"][:3] if test_mode else data["teams"]
+
+        for team in league_teams:
             team_name = team["strTeam"]
             team_id = team["idTeam"]
             teams[team_name] = team_id
@@ -110,7 +112,7 @@ def getTeams(big5):
     print("Teams retrieved successfully.")
     return teams, all_teams
 
-def getPlayers(teams):
+def getPlayers(teams, test_mode=False):
     print("Getting Players...")
     players = {}
     all_players = []
@@ -127,7 +129,9 @@ def getPlayers(teams):
         except ValueError:
             continue
 
-        for player in data["player"]:
+        players_data = data["player"][:5] if test_mode else data["player"]
+
+        for player in players_data:
             print(f"Getting details for player: {player['strPlayer']} (ID: {player['idPlayer']})")
             all_players.append(player)
 

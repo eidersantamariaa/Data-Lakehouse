@@ -17,13 +17,13 @@ leagues = {}
 teams = {}
 players = {}
 
-def get_data():
+def get_data(test_mode=False):
     # Aquí vive todo el código específico de Transfermarkt
     # getBig5, getTeams, getPlayers, etc.
     
-    leagues_dict, leagues_list = getBig5()        # lista de dicts
-    teams_dict, teams_list = getTeams(leagues_dict)     # lista de dicts
-    players = getPlayers(teams_dict) # lista de dicts
+    leagues_dict, leagues_list = getBig5(test_mode=test_mode)        # lista de dicts
+    teams_dict, teams_list = getTeams(leagues_dict, test_mode=test_mode)     # lista de dicts
+    players = getPlayers(teams_dict, test_mode=test_mode) # lista de dicts
 
     # Devuelves un dict con nombre de tabla → lista de dicts
     return {
@@ -32,7 +32,7 @@ def get_data():
         "players": players
     }
 
-def getBig5():
+def getBig5(test_mode=False):
     print("Getting Big 5 Leagues...")
 
     all_leagues = []
@@ -65,7 +65,7 @@ def getBig5():
 
     return big5, all_leagues
 
-def getTeams(big5_leagues):
+def getTeams(big5_leagues, test_mode=False):
     print("Getting Teams...")
     teams = {}
 
@@ -83,6 +83,8 @@ def getTeams(big5_leagues):
         futures = {executor.submit(fetch_teams, name, id): name for name, id in big5_leagues.items()}
         for future in as_completed(futures):
             league_name, league_teams = future.result()
+            if test_mode:
+                league_teams = league_teams[:3]
             teams[league_name] = league_teams
 
     print("Teams retrieved successfully.")
@@ -118,7 +120,7 @@ def writeTeamsToIceberg(teamsList):
                 all_teams.append(team)
     return all_teams
 
-def getPlayers(teams):
+def getPlayers(teams, test_mode=False):
     print("Getting Players...")
     players = {}
 
@@ -130,17 +132,23 @@ def getPlayers(teams):
                 print(f"Error fetching players for {team_name}: {res.status_code}")
                 return team_id, team_name, []
             data = res.json()
-            team_players = [{"id": p["id"], "name": p["name"], "dateOfBirth": p.get("dateOfBirth")} for p in data.get("players", []) if p.get("id") and p.get("name")]
+            raw_players = data.get("players", [])[:5] if test_mode else data.get("players", [])
+            team_players = [{"id": p["id"], "name": p["name"], "dateOfBirth": p.get("dateOfBirth")} for p in raw_players if p.get("id") and p.get("name")]
             return team_id, team_name, team_players
         except Exception as e:
             print(f"Exception fetching players for {team_name}: {e}")
             return team_id, team_name, []
 
     with ThreadPoolExecutor(max_workers=20) as executor:
+        selected_teams = [
+            (team_id, team_name)
+            for league in teams.values()
+            for team_id, team_name in (league[:3] if test_mode else league)
+        ]
+
         futures = [
             executor.submit(fetch_players, team_name, team_id)
-            for league in teams.values()
-            for team_id, team_name in league
+            for team_id, team_name in selected_teams
         ]
         for future in as_completed(futures):
             try:
