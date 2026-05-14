@@ -34,18 +34,12 @@ def _normalize_team_name_for_key(nombre_raw: str) -> str:
     if not nombre_raw:
         return ""
     s = quitar_tildes(str(nombre_raw)).lower()
-    # eliminar tokens comunes (fc, cf, sc, ac, club, the, de, del, etc.)
     s = re.sub(r"\b(fc|cf|sc|ac|club|the|de|del|str|team)\b", "", s)
-    # eliminar todo lo que no sea alfanumérico
     s = re.sub(r"[^a-z0-9]+", "", s)
     return s.upper()
 
 
 def clave_equipo_fecha(nombre, fecha):
-    """Genera clave para equipos usando nombre normalizado + año (si existe).
-
-    - `fecha` puede ser año o fecha; se extrae el primer grupo de 4 dígitos si existe.
-    """
     name_key = _normalize_team_name_for_key(nombre)
     year = ""
     if fecha:
@@ -60,6 +54,79 @@ def clave_equipo_solo_anio(nombre, fecha):
     name_key = _normalize_team_name_for_key(nombre)
     return f"{name_key}{anio}"
 
+
+# ── Aplanado de valores complejos ────────────────────────────────────────────
+# Convierte dicts/listas en strings comparables para que detectar_solapamientos
+# pueda hacer fuzzy matching sobre ellos.  Se aplica en unir_fuentes_df antes
+# de devolver el resultado, de modo que limpieza.py recibe siempre strings planos.
+
+def _aplanar_valor(v):
+    """
+    Convierte un valor complejo (dict, list, ndarray) en un string legible.
+    Devuelve scalars sin modificar.
+
+    Ejemplos:
+        {'name': 'Napoli', 'id': '6195'}  →  'name=Napoli, id=6195'
+        ['Spain', 'Argentina']            →  'Spain, Argentina'
+        'Naples'                          →  'Naples'   (sin cambios)
+    """
+    if isinstance(v, dict):
+        return ", ".join(
+            f"{k}={_aplanar_valor(val)}"
+            for k, val in v.items()
+            if val is not None
+        )
+    if isinstance(v, (list, tuple, set)):
+        return ", ".join(str(i) for i in v if i is not None)
+    # numpy arrays y similares
+    if hasattr(v, "tolist") and not isinstance(v, (str, bytes)):
+        try:
+            return _aplanar_valor(v.tolist())
+        except Exception:
+            return str(v)
+    return v
+
+
+def _es_nulo(v):
+    """Evalúa nulos sin romper cuando el valor es array/lista."""
+    if v is None:
+        return True
+    if isinstance(v, (list, tuple, dict, set)):
+        return False
+    try:
+        na = pd.isna(v)
+        return bool(na) if isinstance(na, bool) else False
+    except Exception:
+        return False
+
+
+def _aplanar_df(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Aplana in-place todas las columnas de `df` que contengan dicts, listas
+    o arrays en alguna de sus filas.  El resto de columnas no se tocan.
+    """
+    # Paso 1: expandir todos los dicts en columnas nuevas
+    for col in list(df.columns):
+        serie = df[col].dropna()
+        if not serie.empty and serie.apply(lambda x: isinstance(x, dict)).any():
+            df = _expandir_dict_col(df, col)
+
+    # Paso 2: aplanar listas en TODAS las columnas,
+    # incluyendo las recién creadas en el paso 1
+    for col in list(df.columns):
+        serie = df[col].dropna()
+        if not serie.empty and serie.apply(
+            lambda x: isinstance(x, (list, tuple, set))
+            or (hasattr(x, "tolist") and not isinstance(x, (str, bytes)))  # ← numpy arrays
+        ).any():
+            df[col] = df[col].apply(
+                lambda v: extraer_representativo(v) if not _es_nulo(v) else None
+            )
+
+    return df
+
+
+# ── Pipeline de matching ─────────────────────────────────────────────────────
 
 def _build_source_frames(*fuentes):
     dfs_con_clave = []
@@ -82,9 +149,7 @@ def generar_mapeo_df(*fuentes, umbral=85):
     mapeo = df_base[base_cols].drop_duplicates(subset='_clave').copy()
     mapeo = mapeo.rename(columns={id_base: f"id_{prefijo_base}"})
     mapeo = mapeo.rename(columns={'_clave': 'clave_canonica'})
-    # `id_propio` should be the canonical clave (inicial+apellido+fecha)
     mapeo['id_propio'] = mapeo['clave_canonica']
-    # keep the source id column for the base prefix
     mapeo[f'id_{prefijo_base}'] = mapeo[f'id_{prefijo_base}']
 
     for df_other, id_other, prefijo_other, umbral_fuente in dfs_con_clave[1:]:
@@ -116,7 +181,6 @@ def generar_mapeo_df(*fuentes, umbral=85):
             else:
                 new_row = {col: None for col in mapeo.columns}
                 new_row['clave_canonica'] = clave
-                # use the canonical clave as id_propio for the added row
                 new_row['id_propio'] = clave
                 new_row[f'id_{prefijo_other}'] = row[f'id_{prefijo_other}']
                 mapeo = pd.concat([mapeo, pd.DataFrame([new_row])], ignore_index=True)
@@ -149,11 +213,21 @@ def unir_fuentes_df(mapeo, *fuentes):
             n = resultado[col_id_mapeo].notna().sum()
             print(f"  Con datos de {prefijo}: {n} ({100*n/total:.1f}%)")
 
-    # Ahora sí eliminar
+    # Eliminar columnas de IDs auxiliares
     cols_ids_apis = [c for c in resultado.columns if c.startswith('id_') and c != 'id_propio']
     resultado = resultado.drop(columns=cols_ids_apis)
     resultado = resultado.rename(columns={'id_propio': 'id'})
-    return resultado[['id'] + [c for c in resultado.columns if c != 'id']]
+    resultado = resultado[['id'] + [c for c in resultado.columns if c != 'id']]
+
+    # ── APLANADO ──────────────────────────────────────────────────────────────
+    # Convertir dicts/listas en strings antes de devolver el DataFrame, para que
+    # detectar_solapamientos y el fuzzy matching de limpieza.py funcionen
+    # correctamente. Ejemplo:
+    #   {'contractExpires':'2030-06-30','name':'Napoli'}  →  'contractExpires=2030-06-30, name=Napoli'
+    resultado = _aplanar_df(resultado)
+
+    return resultado
+
 
 def generar_mapeo(*fuentes, umbral=85):
     """
@@ -174,7 +248,6 @@ def generar_mapeo(*fuentes, umbral=85):
     """
     mapeo = generar_mapeo_df(*fuentes, umbral=umbral)
 
-    # Resumen
     total = len(mapeo)
     print(f"Total jugadores únicos: {total}")
     for _, _, prefijo, _ in _build_source_frames(*fuentes):
@@ -213,7 +286,7 @@ def unir_fuentes(mapeo, *fuentes):
     if hasattr(mapeo, "toPandas"):
         mapeo = mapeo.toPandas()
 
-    resultado = unir_fuentes_df(mapeo, *fuentes)  # ya imprime el resumen
+    resultado = unir_fuentes_df(mapeo, *fuentes)  # ya imprime el resumen + aplana
 
     spark_runtime = _ensure_spark()
     if spark_runtime is None:
@@ -230,3 +303,75 @@ def unir_fuentes(mapeo, *fuentes):
         for _, row in resultado.iterrows()
     ]
     return spark_runtime.read.json(spark_runtime.sparkContext.parallelize(filas_json))
+
+import re
+
+# Claves que suelen contener el nombre principal en cualquier API deportiva
+_CLAVES_NOMBRE = {
+    "name", "nombre", "player", "team", "club", "title",
+    "label", "strname", "strplayer", "strteam", "fullname"
+}
+
+def _parece_nombre(v):
+    """True si el string parece un nombre y no una fecha, ID o número."""
+    s = str(v).strip()
+    if not s or s.lower() == "none":
+        return False
+    if re.fullmatch(r"\d+", s):               # ID numérico
+        return False
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}.*", s):  # fecha
+        return False
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", s[:10]):
+        return False
+    return True
+
+def extraer_representativo(v):
+    """
+    Extrae el string más representativo de un valor complejo.
+    
+    dict  → busca clave nombre conocida, si no la hay toma
+            el valor string más largo que parezca un nombre
+    list  → primer elemento que parezca un nombre
+    resto → devuelve tal cual
+    """
+    if isinstance(v, dict):
+        # 1. Buscar clave prioritaria (case-insensitive)
+        for k, val in v.items():
+            if k.lower() in _CLAVES_NOMBRE and val and _parece_nombre(val):
+                return str(val).strip()
+        # 2. Fallback: el string más largo que parezca un nombre
+        candidatos = [
+            str(val).strip()
+            for val in v.values()
+            if val is not None and _parece_nombre(val)
+        ]
+        return max(candidatos, key=len) if candidatos else None
+
+    if isinstance(v, (list, tuple, set)):
+        for item in v:
+            if item is not None and _parece_nombre(str(item)):
+                return str(item).strip()
+        return None
+
+    if hasattr(v, "tolist") and not isinstance(v, (str, bytes)):
+        return extraer_representativo(v.tolist())
+
+    return v
+
+def _expandir_dict_col(df: pd.DataFrame, col: str) -> pd.DataFrame:
+    """
+    Si col contiene dicts, crea nuevas columnas col_key1, col_key2...
+    y elimina la original.
+    """
+    muestra = df[col].dropna()
+    if not muestra.apply(lambda x: isinstance(x, dict)).any():
+        return df
+
+    expandida = df[col].apply(
+        lambda v: v if isinstance(v, dict) else {}
+    ).apply(pd.Series).add_prefix(f"{col}_")
+
+    # Solo columnas con al menos un valor no nulo
+    expandida = expandida.loc[:, expandida.notna().any()]
+
+    return pd.concat([df.drop(columns=[col]), expandida], axis=1)

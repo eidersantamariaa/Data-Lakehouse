@@ -181,21 +181,37 @@
 
         /* ── Explorer ── */
         .explorer-layout {
-            display: grid;
-            grid-template-columns: 236px 1fr;
+            display: flex;
             width: 100%;
             overflow: hidden;
         }
 
         .sidebar {
+            width: 236px;
+            min-width: 120px;
+            max-width: 600px;
             border-right: 0.5px solid var(--color-border-tertiary);
             overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .resize-handle {
+            width: 4px;
+            cursor: col-resize;
+            background: transparent;
+            flex-shrink: 0;
+            transition: background 0.15s;
+        }
+
+        .resize-handle:hover,
+        .resize-handle.dragging {
+            background: #1D9E75;
         }
 
         .explorer-main {
-            display: flex;
-            flex-direction: column;
+            flex: 1;
             overflow: hidden;
+            min-width: 0;
         }
 
         .sub-tabs {
@@ -1047,6 +1063,7 @@
             <div class="page on" id="page-explorer">
                 <div class="explorer-layout">
                     <div class="sidebar" id="sidebar"></div>
+                    <div class="resize-handle" id="resize-handle"></div>
                     <div class="explorer-main">
                         <div class="sub-tabs" id="sub-tabs" style="display:none">
                             <div class="stab on" onclick="switchSub('schema',this)">schema</div>
@@ -1549,9 +1566,12 @@
             setResult('merge-result', `<div class="tt-result-hdr"><span class="spinning">◌</span> applying…</div>`);
             try {
                 const r = await fetch(`/merge/apply/${sel}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ config: mergeConfig, target_table: tt }) });
-                const data = await r.json(); if (data.error) throw new Error(data.error);
+                const data = await r.json().catch(() => ({}));
+                if (!r.ok) throw new Error(data.error || data.detail || `HTTP ${r.status}`);
+                if (data.error) throw new Error(data.error);
+                const cols = Array.isArray(data.cols) ? data.cols : [];
                 setResult('merge-result', `<div class="tt-result-hdr"><span class="ok">✓ saved as ${tt}</span></div>
-            <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px">${data.rows} rows · ${data.cols.length} cols</div>`);
+            <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px">${data.rows ?? '—'} rows · ${cols.length} cols</div>`);
                 loadTables();
             } catch (e) { setResult('merge-result', `<div class="tt-result-hdr"><span class="err">✗ ${e.message}</span></div>`); }
             finally { ab.disabled = false; ab.textContent = 'apply & save'; }
@@ -1683,11 +1703,11 @@
             </div>
             <div class="match-row">
                 <label>mapping table (namespace.table)</label>
-                <input id="match-mapping-target" value="players.mapping.players_mapping" style="width:100%" placeholder="players.mapping.players_mapping">
+                <input id="match-mapping-target" value="players.mapping.players_mapping" style="width:100%" placeholder="mapping.players_mapping">
             </div>
             <div class="match-row">
                 <label>final table (namespace.table)</label>
-                <input id="match-unified-target" value="players.mapping.players_unified" style="width:100%" placeholder="players.mapping.players_unified">
+                <input id="match-unified-target" value="players.mapping.players_unified" style="width:100%" placeholder="mapping.players_unified">
             </div>
         </div>
         <div class="matching-grid">${cards}</div>
@@ -1881,6 +1901,36 @@
                 else alert('Connection failed: ' + (data.msg || 'unknown error'));
             } catch (e) { alert('Connection failed: ' + e.message); }
         }
+
+        /* ── Resize sidebar ── */
+        (function () {
+            const handle = document.getElementById('resize-handle');
+            const sidebar = document.getElementById('sidebar');
+            if (!handle || !sidebar) return;
+            let dragging = false;
+
+            handle.addEventListener('mousedown', e => {
+                dragging = true;
+                handle.classList.add('dragging');
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+            });
+
+            document.addEventListener('mousemove', e => {
+                if (!dragging) return;
+                const layout = document.querySelector('.explorer-layout');
+                const x = e.clientX - layout.getBoundingClientRect().left;
+                sidebar.style.width = Math.min(Math.max(x, 120), 600) + 'px';
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (!dragging) return;
+                dragging = false;
+                handle.classList.remove('dragging');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            });
+        })();
 
         /* ── Init ── */
         renderApiGrid();

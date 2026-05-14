@@ -1,10 +1,7 @@
-# limpieza.py
 import pandas as pd
 import re
 from datetime import datetime
 from rapidfuzz import fuzz
-
-from limpieza import normalize_text, normalize_date, normalize_height, normalize_weight, normalize_currency, normalize_position
 
 errores_log = []
 
@@ -28,18 +25,17 @@ def detectar_solapamientos(df, umbral_similitud=0.7):
             continue
 
         ambas = df[[col1, col2]].dropna()
-        if len(ambas) < 10:
+        if len(ambas) < 3:
             continue
 
         try:
             s1 = ambas[col1].astype(str).str.lower().str.strip()
             s2 = ambas[col2].astype(str).str.lower().str.strip()
 
-            # Comparación fuzzy fila a fila
             scores = [fuzz.ratio(a, b) / 100 for a, b in zip(s1, s2)]
             coincidencias = sum(s >= umbral_similitud for s in scores) / len(scores)
 
-            if coincidencias >= 0.5:  # al menos 50% de filas son similares
+            if coincidencias >= 0.5:
                 candidatos.append({
                     "col1": col1,
                     "col2": col2,
@@ -62,7 +58,6 @@ def detectar_solapamientos_agrupados(df, umbral_similitud=0.5):
     if candidatos.empty:
         return []
 
-    # Union-Find para agrupar columnas relacionadas
     parent = {}
 
     def find(x):
@@ -77,13 +72,11 @@ def detectar_solapamientos_agrupados(df, umbral_similitud=0.5):
     for _, row in candidatos.iterrows():
         union(row["col1"], row["col2"])
 
-    # Agrupar columnas por cluster
     grupos = {}
     for col in set(candidatos["col1"]) | set(candidatos["col2"]):
         root = find(col)
         grupos.setdefault(root, set()).add(col)
 
-    # Calcular coincidencia media del grupo
     resultado = []
     for cols in grupos.values():
         cols = list(cols)
@@ -100,10 +93,10 @@ def detectar_solapamientos_agrupados(df, umbral_similitud=0.5):
 def configurar_solapamientos(df, umbral_similitud=0.5):
     """
     Detecta solapamientos y pregunta al usuario qué columnas quiere consolidar.
-    Devuelve un COLUMNAS_CONFIG listo para usar en limpiar_tabla.
+    Devuelve una config lista para pasar directamente a limpiar_tabla().
     """
     candidatos = detectar_solapamientos(df, umbral_similitud)
-    
+
     if candidatos.empty:
         print("No se detectaron solapamientos.")
         return []
@@ -114,7 +107,6 @@ def configurar_solapamientos(df, umbral_similitud=0.5):
     for _, row in candidatos.iterrows():
         col1, col2 = row["col1"], row["col2"]
 
-        # Evitar procesar columnas ya agrupadas
         if col1 in grupos_procesados or col2 in grupos_procesados:
             continue
 
@@ -130,7 +122,6 @@ def configurar_solapamientos(df, umbral_similitud=0.5):
         if respuesta != "s":
             continue
 
-        # Buscar si hay más columnas relacionadas
         relacionadas = candidatos[
             (candidatos["col1"].isin([col1, col2])) |
             (candidatos["col2"].isin([col1, col2]))
@@ -149,7 +140,7 @@ def configurar_solapamientos(df, umbral_similitud=0.5):
                 todas_cols = [c.strip() for c in seleccion.split(",")]
 
         col_final = input(f"\nNombre de la columna consolidada: ").strip()
-        
+
         prefijos = [c.split("_")[0] for c in todas_cols]
         tiebreaker = todas_cols[prefijos.index("tm")] if "tm" in prefijos else todas_cols[0]
         print(f"Tiebreaker por defecto: {tiebreaker} (Enter para confirmar o escribe otro):")
@@ -161,7 +152,7 @@ def configurar_solapamientos(df, umbral_similitud=0.5):
             "col_final":  col_final,
             "fuentes":    todas_cols,
             "tiebreaker": tiebreaker,
-            "normalizar": lambda x: x,  # sin normalización por defecto
+            "normalizar": lambda x: x,
         })
 
         grupos_procesados.update(todas_cols)
@@ -169,8 +160,8 @@ def configurar_solapamientos(df, umbral_similitud=0.5):
 
     print(f"\n{'='*50}")
     print(f"Config generado con {len(config)} columnas consolidadas.")
-    print("Puedes añadir funciones de normalización manualmente en COLUMNAS_CONFIG.")
-    
+    print("Puedes pasar el resultado directamente a limpiar_tabla().")
+
     return config
 
 def _registrar_error(col, valor, motivo, idx):
@@ -180,25 +171,6 @@ def _registrar_error(col, valor, motivo, idx):
         "motivo":  motivo,
         "fila":    idx
     })
-
-def from_list(normalizar):
-    """Wrapper para columnas que pueden ser lista o string."""
-    def _inner(v):
-        if isinstance(v, list):
-            v = v[0] if len(v) > 0 else None
-        return normalizar(v) if v is not None else None
-    return _inner
-
-def extraer_nombre_equipo(v):
-    if not isinstance(v, list):
-        return normalize_text(v) if v else None
-    
-    # El nombre del equipo suele estar al final, devolver el último elemento no-nulo
-    for item in reversed(v):
-        if item is not None:
-            return normalize_text(item)
-    
-    return None
 
 # ── Funciones de validación ──────────────────────────────────────────────────
 
@@ -252,84 +224,32 @@ def validar_año(v):
     except:
         return None, f"Año no parseable: {v}"
 
-# ── Config validaciones ──────────────────────────────────────────────────────
+def _inferir_validador(serie):
+    muestra = serie.dropna().astype(str)
+    if muestra.str.fullmatch(r"\d{4}-\d{2}-\d{2}.*").mean() > 0.5:
+        return validar_fecha
+    if muestra.str.fullmatch(r"\d{1,2}").mean() > 0.5:
+        return validar_edad
+    if muestra.str.match(r"https?://").mean() > 0.5:
+        return validar_url
+    if muestra.str.fullmatch(r"\d{3}").mean() > 0.5:
+        return validar_altura
+    return None
 
-VALIDACIONES = [
-    {"col": "fb_age",      "validar": validar_edad},
-    {"col": "born",        "validar": validar_fecha},
-    {"col": "tm_dateOfBirth", "validar": validar_fecha},
-    {"col": "ts_dateBorn", "validar": validar_fecha},
-    {"col": "height",      "validar": validar_altura},
-    {"col": "tm_imageUrl", "validar": validar_url},
-    {"col": "fb_born",     "validar": validar_año},
-]
-
-COLUMNAS_CONFIG = [
-    {
-        "col_final":  "name",
-        "fuentes":    ["tm_name", "ts_strPlayer", "fb_player"],
-        "tiebreaker": "tm_name",
-        "normalizar": normalize_text,
-    },
-    {
-        "col_final":  "born",
-        "fuentes":    ["tm_dateOfBirth", "ts_dateBorn", "fb_born"],
-        "tiebreaker": "tm_dateOfBirth",
-        "normalizar": normalize_date,
-    },
-    {
-        "col_final":  "nationality",
-        "fuentes":    ["tm_citizenship", "ts_strNationality", "fb_nation"],
-        "tiebreaker": "tm_citizenship",
-        "normalizar": from_list(normalize_text),  # lista
-    },
-    {
-        "col_final":  "position",
-        "fuentes":    ["tm_position", "ts_strPosition", "fb_pos"],
-        "tiebreaker": "tm_position",
-        "normalizar": from_list(normalize_position),  # lista
-    },
-    {
-        "col_final":  "height (cm)",
-        "fuentes":    ["tm_height", "ts_strHeight"],
-        "tiebreaker": "tm_height",
-        "normalizar": normalize_height,
-    },
-    {
-        "col_final":  "team",
-        "fuentes":    ["tm_club", "ts_strTeam", "fb_team"],
-        "tiebreaker": "tm_club",
-        "normalizar": extraer_nombre_equipo,  # lista
-    },
-    {
-        "col_final":  "weight (kg)",
-        "fuentes":    ["ts_strWeight"],
-        "tiebreaker": "ts_strWeight",
-        "normalizar": normalize_weight,  # lista
-    },
-]
-
-COLUMNAS_NORMALIZAR = [
-    {"col": "tm_marketValue", "normalizar": normalize_currency},
-    {"col": "fb_age", "normalizar": lambda v: int(str(v).split("-")[0].strip()) if v and "-" in str(v) else v},
-]
-
+# ── Helpers internos ─────────────────────────────────────────────────────────
 
 def _es_nulo(v):
-    """Evalua nulos sin romper cuando el valor es array/lista."""
     if v is None:
         return True
     if isinstance(v, (list, tuple, dict, set)):
         return False
     try:
         na = pd.isna(v)
-        return bool(na) if isinstance(na, (bool,)) else False
+        return bool(na) if isinstance(na, bool) else False
     except Exception:
         return False
 
-
 def _clave_voto(v):
-    """Convierte valores complejos en claves hashables para el conteo."""
     if isinstance(v, dict):
         return tuple(sorted((k, _clave_voto(val)) for k, val in v.items()))
     if isinstance(v, (list, tuple, set)):
@@ -337,7 +257,6 @@ def _clave_voto(v):
     if hasattr(v, "tolist"):
         return _clave_voto(v.tolist())
     return v
-
 
 def _votar(valores_norm):
     """
@@ -358,16 +277,20 @@ def _votar(valores_norm):
     mayoria = [k for k, n in conteo.items() if n >= 2]
     return originales[mayoria[0]] if mayoria else None
 
-def validar_tabla(df, validaciones=VALIDACIONES):
+# ── Validación ───────────────────────────────────────────────────────────────
+
+def validar_tabla(df):
+    """
+    Recorre todas las columnas, infiere el validador apropiado por contenido
+    y registra/corrige los valores fuera de rango.
+    """
     global errores_log
     errores_log = []
     df = df.copy()
 
-    for entrada in validaciones:
-        col     = entrada["col"]
-        validar = entrada["validar"]
-
-        if col not in df.columns:
+    for col in df.columns:
+        validar = _inferir_validador(df[col])
+        if validar is None:
             continue
 
         def aplicar(row, col=col, validar=validar):
@@ -381,7 +304,6 @@ def validar_tabla(df, validaciones=VALIDACIONES):
 
         df[col] = df.apply(aplicar, axis=1)
 
-    # Resumen
     print(f"Total errores detectados: {len(errores_log)}")
     errores_por_col = pd.DataFrame(errores_log).groupby("columna").size() if errores_log else {}
     for col, n in errores_por_col.items():
@@ -389,18 +311,53 @@ def validar_tabla(df, validaciones=VALIDACIONES):
 
     return df, pd.DataFrame(errores_log)
 
-def limpiar_tabla(df, config=COLUMNAS_CONFIG, config_norm=COLUMNAS_NORMALIZAR, usar_fuzzy=True):
-    """
-    df: pandas DataFrame con columnas prefijadas (tm_, ts_, fb_...)
-    config: lista de dicts con col_final, fuentes, tiebreaker, normalizar
+# ── Limpieza principal ───────────────────────────────────────────────────────
 
-    Para añadir una nueva columna consolidada basta con añadir
-    un dict a COLUMNAS_CONFIG.
+def limpiar_tabla(df, grupos=None):
     """
+    Consolida columnas solapadas entre fuentes (tm_, ts_, fb_...) en una
+    sola columna por concepto, votando entre fuentes cuando hay mayoría
+    y usando el tiebreaker (preferencia tm_) en caso de empate.
+
+    grupos: output de detectar_solapamientos_agrupados() o configurar_solapamientos().
+            Si es None se detectan automáticamente.
+    """
+    if grupos is None:
+        grupos = detectar_solapamientos_agrupados(df)
+
+    # Convertir formato grupos/config → config interna
+    # Soporta dos formatos:
+    # - Deteccion automatica: {"columnas": [...], "coincidencia": ...}
+    # - Config manual UI: {"col_final": ..., "fuentes": [...], "tiebreaker": ...}
+    config = []
+    for grupo in grupos:
+        if isinstance(grupo, dict) and "fuentes" in grupo:
+            cols = [c for c in grupo.get("fuentes", []) if isinstance(c, str)]
+            if not cols:
+                continue
+            prefijos = [c.split("_")[0] for c in cols]
+            tiebreaker = grupo.get("tiebreaker")
+            if tiebreaker not in cols:
+                tiebreaker = cols[prefijos.index("tm")] if "tm" in prefijos else cols[0]
+            col_final = str(grupo.get("col_final") or "").strip()
+            if not col_final:
+                col_final = "_".join(tiebreaker.split("_")[1:])  # tm_dateOfBirth → dateOfBirth
+        else:
+            cols = grupo["columnas"]
+            prefijos = [c.split("_")[0] for c in cols]
+            tiebreaker = cols[prefijos.index("tm")] if "tm" in prefijos else cols[0]
+            col_final = "_".join(tiebreaker.split("_")[1:])  # tm_dateOfBirth → dateOfBirth
+        config.append({
+            "col_final":  col_final,
+            "fuentes":    cols,
+            "tiebreaker": tiebreaker,
+            "normalizar": lambda x: x,
+        })
+
     df = df.copy()
     cols_a_eliminar = []
 
-    # Paso 1: votar columnas solapadas
+    # Paso 1: votar columnas solapadas y consolidar
     for entrada in config:
         col_final  = entrada["col_final"]
         fuentes    = [f for f in entrada["fuentes"] if f in df.columns]
@@ -411,7 +368,6 @@ def limpiar_tabla(df, config=COLUMNAS_CONFIG, config_norm=COLUMNAS_NORMALIZAR, u
             continue
 
         def resolver_fila(row, fuentes=fuentes, tiebreaker=tiebreaker, normalizar=normalizar):
-            # Normalizar cada valor
             valores_norm = {}
             for col in fuentes:
                 v = row.get(col)
@@ -421,12 +377,10 @@ def limpiar_tabla(df, config=COLUMNAS_CONFIG, config_norm=COLUMNAS_NORMALIZAR, u
                     except:
                         valores_norm[col] = None
 
-            # Votar
             ganador = _votar(valores_norm)
             if ganador is not None:
                 return ganador
 
-            # Tiebreaker
             return valores_norm.get(tiebreaker)
 
         df[col_final] = df.apply(resolver_fila, axis=1)
@@ -434,15 +388,7 @@ def limpiar_tabla(df, config=COLUMNAS_CONFIG, config_norm=COLUMNAS_NORMALIZAR, u
 
     df = df.drop(columns=cols_a_eliminar)
 
-    # Paso 2: normalizar columnas únicas
-    for entrada in config_norm:
-        col = entrada["col"]
-        if col not in df.columns:
-            continue
-        normalizar = entrada["normalizar"]
-        df[col] = df[col].apply(lambda v: normalizar(v) if not _es_nulo(v) else None)
-
-    # Paso 3: aplanar columnas con valores complejos para que Spark pueda inferir tipo
+    # Paso 2: aplanar columnas con valores complejos para que Spark pueda inferir tipo
     def aplanar_valor(v):
         if isinstance(v, dict):
             return ", ".join(f"{k}={i}" for k, i in v.items() if i is not None)
@@ -456,13 +402,16 @@ def limpiar_tabla(df, config=COLUMNAS_CONFIG, config_norm=COLUMNAS_NORMALIZAR, u
         return v
 
     for col in df.columns:
-        if df[col].dropna().apply(lambda x: isinstance(x, (list, tuple, set, dict)) or (hasattr(x, "tolist") and not isinstance(x, (str, bytes)))).any():
+        if df[col].dropna().apply(
+            lambda x: isinstance(x, (list, tuple, set, dict))
+            or (hasattr(x, "tolist") and not isinstance(x, (str, bytes)))
+        ).any():
             df[col] = df[col].apply(lambda v: aplanar_valor(v) if not _es_nulo(v) else None)
 
-    # Reordenar: ids + cols consolidadas + resto
-    cols_ids = [c for c in df.columns if c == "id"]
+    # Reordenar: id + cols consolidadas + resto
+    cols_ids         = [c for c in df.columns if c == "id"]
     cols_consolidadas = [e["col_final"] for e in config if e["col_final"] in df.columns]
-    cols_resto       = [c for c in df.columns if c not in cols_ids and c not in cols_consolidadas]
+    cols_resto        = [c for c in df.columns if c not in cols_ids and c not in cols_consolidadas]
 
     df = df[cols_ids + cols_consolidadas + cols_resto]
 
