@@ -6,6 +6,7 @@ import re
 from rapidfuzz import process, fuzz
 from ingesta import get_spark
 from funciones_mapeo import extraer_inicial_apellido, generar_clave, quitar_tildes
+from limpieza import normalize_text, normalize_date, normalize_height, normalize_weight, normalize_currency, normalize_position
 
 spark = None
 
@@ -125,6 +126,38 @@ def _aplanar_df(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
+# ── Metodos normalizar ─────────────────────────────────────────────────────
+
+def _inferir_normalizador(col: str):
+    """Infiere la función de normalización por el nombre de la columna."""
+    c = col.lower()
+    if any(x in c for x in ("height", "altura")):
+        return normalize_height
+    if any(x in c for x in ("weight", "peso")):
+        return normalize_weight
+    if any(x in c for x in ("value", "price", "salary", "wage", "marketvalue", "marketValue", "market_value")):
+        return normalize_currency
+    if any(x in c for x in ("date", "born", "birth", "dob")):
+        return normalize_date
+    if any(x in c for x in ("position", "pos")):
+        return normalize_position
+    return normalize_text  # fallback para strings
+
+def _normalizar_df(df: pd.DataFrame) -> pd.DataFrame:
+    for col in df.columns:
+        if col == 'id':
+            continue
+        # Solo normalizar columnas string, saltar numéricas y booleanas
+        if df[col].dtype not in (object, "string"):
+            continue
+        serie = df[col].dropna()
+        if serie.empty:
+            continue
+        fn = _inferir_normalizador(col)
+        df[col] = df[col].apply(
+            lambda v: fn(v) if not _es_nulo(v) else None
+        )
+    return df
 
 # ── Pipeline de matching ─────────────────────────────────────────────────────
 
@@ -225,6 +258,7 @@ def unir_fuentes_df(mapeo, *fuentes):
     # correctamente. Ejemplo:
     #   {'contractExpires':'2030-06-30','name':'Napoli'}  →  'contractExpires=2030-06-30, name=Napoli'
     resultado = _aplanar_df(resultado)
+    resultado = _normalizar_df(resultado)
 
     return resultado
 
