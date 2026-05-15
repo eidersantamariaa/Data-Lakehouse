@@ -29,8 +29,8 @@ from ingesta import get_spark
 # ─────────────────────────────────────────────
 
 CATALOG_NAME     = "players"
-DEFAULT_DATABASE = "transfermarkt"
-DEFAULT_TABLE    = "players_bronce"
+DEFAULT_DATABASE = "mapping"
+DEFAULT_TABLE    = "players_unified"
 DEFAULT_QUERY    = "SELECT COUNT(*) FROM {table}"
 DEFAULT_RUNS     = 10
 WARMUP_RUNS      = 2   # ejecuciones de calentamiento (no se miden)
@@ -269,7 +269,7 @@ def main() -> None:
     timestamp:   Optional[str] = args.timestamp
 
     if snapshot_id is None and timestamp is None:
-        n           = min(args.use_nth_snapshot, len(snapshots) - 1)
+        n           = min(args.use_nth_snapshot, len(snapshots) - 2)
         snapshot_id = snapshots[n]["snapshot_id"]
         print(f"\n🔍 Usando snapshot [{n}]  "
               f"id={snapshot_id}  at={snapshots[n]['committed_at']}")
