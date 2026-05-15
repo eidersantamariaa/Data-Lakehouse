@@ -238,7 +238,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--no-plot",        action="store_true")
     p.add_argument("--list-snapshots", action="store_true",
                    help="Solo listar snapshots disponibles y salir")
-    return p.parse_args()
+    args, _ = p.parse_known_args()
+    return args
 
 
 def main() -> None:
