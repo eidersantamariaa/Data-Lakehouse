@@ -188,7 +188,8 @@ def plot_results(results: list[BenchmarkResult],
         print("ℹ️  matplotlib no disponible; saltando gráfico.")
         return
 
-    fig, ax1 = plt.subplots(1, 2, figsize=(12, 5))
+    fig, (ax1) = plt.subplots(1, 2, figsize=(12, 5))
+    fig.suptitle("Iceberg Time Travel Benchmark", fontsize=14, fontweight="bold")
     colors = ["#2563eb", "#dc2626"]
 
     runs = range(1, len(results[0].times) + 1)
