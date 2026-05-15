@@ -199,14 +199,6 @@ def plot_results(results: list[BenchmarkResult],
     ax1.legend(fontsize=8)
     ax1.grid(True, alpha=0.3)
 
-    bp = ax2.boxplot([r.times for r in results], patch_artist=True, widths=0.4)
-    for patch, c in zip(bp["boxes"], colors):
-        patch.set_facecolor(c)
-        patch.set_alpha(0.6)
-    ax2.set_xticklabels(["Current", "Time Travel"], fontsize=10)
-    ax2.set(ylabel="Tiempo (s)", title="Distribución de tiempos")
-    ax2.grid(True, alpha=0.3, axis="y")
-
     plt.tight_layout()
     plt.savefig(path, dpi=150)
     print(f"📊 Gráfico guardado en: {path}")
