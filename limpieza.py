@@ -66,6 +66,7 @@ def normalize_height(value):
     if "ft" in v:
         ft = re.findall(r"(\d+)\s*ft", v)
         inch = re.findall(r"(\d+)\s*in", v)
+        inch = re.findall(r"(\d+)\s*inches", v)
         ft = float(ft[0]) if ft else 0
         inch = float(inch[0]) if inch else 0
         return round(float((ft * 30.48) + (inch * 2.54)), 2  )
@@ -117,41 +118,57 @@ def normalize_weight(value):
         else:
             lbs = float(re.findall(r"\d+", v)[0])
             return float(f"{lbs * 0.453592:.2f}")
+    if "lbs" in v:
+        if "." in v:
+            lbs = float(re.findall(r"\d+\.?\d*", v)[0])
+            return float(f"{lbs * 0.453592:.2f}")
+        else:
+            lbs = float(re.findall(r"\d+", v)[0])
+            return float(f"{lbs * 0.453592:.2f}")
     return None
+
+"""
+test_cases = [
+    # (input, descripción)
+    ("75 kg",      "kilogramos enteros"),
+    ("75.5 kg",    "kilogramos con decimal"),
+    ("75,5 kg",    "kilogramos con coma"),
+    ("75KG",       "kilogramos en mayúsculas"),
+    ("165 lb",     "libras enteras"),
+    ("165.5 lb",   "libras con decimal"),
+    ("165,5 lb",   "libras con coma"),
+    ("165LB",      "libras en mayúsculas"),
+    ("0 kg",       "cero kilogramos"),
+    ("0 lb",       "cero libras"),
+    ("abc",        "texto inválido"),
+    (None,          "valor nulo"),
+]
+
+for value, desc in test_cases:
+    result = normalize_weight(value)
+    print(f"{str(value):<15} → {str(result):<10}  ({desc})")
+"""
 
 def normalize_currency(value):
     if value is None:
         return None
+
     v = str(value).lower().strip()
     v = v.replace("gbp", "£").replace("usd", "$").replace("eur", "€")
+
     if "£" in v:
         currency = "£"
     elif "$" in v:
         currency = "$"
-    elif "€" in v:
-        currency = "€"
     else:
-        # sin símbolo — si hay números simplifica, si no devuelve el texto
-        nums = re.findall(r"-?\d+\.?\d*", v)
-        if not nums:
-            return str(value).strip()
-        amount = float(nums[0])
-        if amount < 0:
-            return str(value).strip()  # mantiene "-" o texto con minus
-        if amount >= 1_000_000:
-            return f"{round(amount / 1_000_000, 2)}m"
-        elif amount >= 1_000:
-            return f"{round(amount / 1_000, 2)}k"
-        else:
-            return str(amount)
-    
-    num_str = v.replace(currency, "").strip()
-    s = num_str.strip()
+        currency = "€"  # € explícito o sin símbolo → asume EUR
+
+    s = v.replace(currency, "").strip()
 
     multiplier = 1
     if "million" in s or "mill" in s or "millones" in s:
         multiplier = 1_000_000
-        s = s[:s.rfind("m")].strip()  # quita todo desde la m de mill
+        s = s[:s.rfind("m")].strip()
     elif "miles" in s or "mil" in s:
         multiplier = 1_000
         s = re.sub(r"mil(es)?$", "", s).strip()
@@ -166,46 +183,67 @@ def normalize_currency(value):
     has_dot   = "." in s
 
     if has_comma and has_dot:
-        # el último separador es el Float
-        # 1,000.50 → quita comas   |   1.000,50 → quita puntos y coma→punto
         if s.rfind(".") > s.rfind(","):
-            s = s.replace(",", "")           # 1,000.50 → 1000.50
+            s = s.replace(",", "")
         else:
-            s = s.replace(".", "").replace(",", ".")  # 1.000,50 → 1000.50
-
+            s = s.replace(".", "").replace(",", ".")
     elif has_comma:
         after_comma = s.split(",")[-1]
         if len(after_comma) == 3:
-            s = s.replace(",", "")           # 1,000 → 1000 (miles)
+            s = s.replace(",", "")
         else:
-            s = s.replace(",", ".")          # 1,5 → 1.5 (Float)
-
+            s = s.replace(",", ".")
     elif has_dot:
         after_comma = s.split(".")[-1]
         if len(after_comma) == 3:
-            s = s.replace(".", "")           # 1.000 → 1000 (miles)
+            s = s.replace(".", "")
 
-    nums = re.findall(r"\d+\.?\d*", s)
+    nums = re.findall(r"-?\d+\.?\d*", s)
     if not nums:
         return str(value).strip()
-    s = nums[0]
 
-    amount = float(s) * multiplier
-    # convertir a EUR
+    amount = float(nums[0]) * multiplier
+
+    if amount < 0:
+        return str(value).strip()
+
     if currency == "£":
         amount = round(amount * 1.15, 2)
-    if currency == "$":
+    elif currency == "$":
         amount = round(amount * 0.86, 2)
-    if currency == "€":
+    else:
         amount = round(amount, 2)
 
-    # formatear como xk o xm
     if amount >= 1_000_000:
-        return f"{round(amount / 1_000_000, 2)}m"
+        return f"{round(amount / 1_000_000, 2):g}m"
     elif amount >= 1_000:
-        return f"{round(amount / 1_000, 2)}k"
+        return f"{round(amount / 1_000, 2):g}k"
     else:
-        return str(amount)
+        return f"{amount:g}"
+
+"""
+test_cases_currency = [
+    # (input, descripción)
+    ("£1,000",         "GBP con coma miles"),
+    ("£1.5m",          "GBP millones con m"),
+    ("$1,200.50",      "USD con decimal"),
+    ("€850",           "EUR simple"),
+    ("1000",           "sin símbolo, número simple"),
+    ("1.5m",           "sin símbolo, millones (m)"),
+    ("1.500,50",       "formato europeo con punto miles y coma decimals"),
+    ("USD 2,000",      "prefijo USD"),
+    ("GBP 2m",         "prefijo GBP millones"),
+    ("N/A",            "texto no numérico"),
+    (None,              "valor nulo"),
+    ("-500",           "cantidad negativa"),
+    ("500k",           "miles con k"),
+    ("€1.000,50",      "EUR europeo con miles y decimales"),
+]
+
+for value, desc in test_cases_currency:
+    result = normalize_currency(value)
+    print(f"{str(value):<15} → {str(result):<12}  ({desc})")
+"""
 
 def normalize_date(value):
     if value is None:
