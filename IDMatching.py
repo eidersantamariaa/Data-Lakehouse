@@ -67,8 +67,8 @@ def _normalize_league_name_for_key(nombre_raw: str) -> str:
     if not nombre_raw:
         return ""
     s = quitar_tildes(str(nombre_raw)).lower()
-    # palabras a eliminar específicas de ligas
-    s = re.sub(r"\b(league|liga|serie|a|1|one|premier|division|liga1|liga2|the|de|del|of)\b", "", s)
+    # palabras a eliminar específicas de ligas y adjetivos de país/artículos
+    s = re.sub(r"\b(spanish|english|german|italian|french|scottish|dutch|irish)\b", "", s)
     s = re.sub(r"[^a-z0-9]+", "", s)
     return s.upper()
 
