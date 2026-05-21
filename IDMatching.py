@@ -5,7 +5,7 @@ import math
 import re
 from rapidfuzz import process, fuzz
 from ingesta import get_spark
-from funciones_mapeo import extraer_inicial_apellido, generar_clave, quitar_tildes
+from funciones_mapeo import extraer_inicial_apellido, generar_clave, quitar_tildes, clave_por_nacionalidad
 from limpieza import normalize_text, normalize_date, normalize_height, normalize_weight, normalize_currency, normalize_position
 
 spark = None
@@ -18,6 +18,8 @@ def _ensure_spark():
         except Exception:
             spark = None
     return spark
+
+# --- Funciones de clave específicas para jugadores --------------------------------
 
 # Función para fuentes con fecha completa
 def clave_fecha_completa(nombre, fecha):
@@ -54,6 +56,28 @@ def clave_equipo_solo_anio(nombre, fecha):
     anio = str(fecha)[:4] if fecha else ""
     name_key = _normalize_team_name_for_key(nombre)
     return f"{name_key}{anio}"
+
+# --- Funciones de clave específicas para ligas --------------------------------
+def _normalize_nationality_for_key(nationality: str) -> str:
+    """Normaliza la nacionalidad para usarla en una clave (sin tildes, sin espacios, uppercase)."""
+    if not nationality:
+        return ""
+    s = quitar_tildes(str(nationality)).lower()
+    s = re.sub(r"\s+", "", s)
+    s = re.sub(r"[^a-z0-9]+", "", s)
+    return s.upper()
+
+
+def clave_por_nacionalidad(nombre: str, nationality: str) -> str:
+    """Genera una clave a partir del nombre y la nacionalidad.
+
+    Útil cuando la columna que acompaña al nombre no es una fecha sino
+    la nacionalidad del jugador.
+    """
+    inicial, apellido = extraer_inicial_apellido(nombre)
+    nat_key = _normalize_nationality_for_key(nationality)
+    return f"{inicial}{apellido}{nat_key}"
+
 
 
 # ── Aplanado de valores complejos ────────────────────────────────────────────
