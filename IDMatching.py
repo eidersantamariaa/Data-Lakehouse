@@ -58,25 +58,30 @@ def clave_equipo_solo_anio(nombre, fecha):
     return f"{name_key}{anio}"
 
 # --- Funciones de clave específicas para ligas --------------------------------
-def _normalize_nationality_for_key(nationality: str) -> str:
-    """Normaliza la nacionalidad para usarla en una clave (sin tildes, sin espacios, uppercase)."""
-    if not nationality:
+def _normalize_league_name_for_key(nombre_raw: str) -> str:
+    """Normaliza nombres de ligas para generar claves comparables.
+
+    Elimina palabras comunes como 'league', 'liga', 'serie', 'premier',
+    quita tildes y signos, y devuelve una cadena uppercase sin espacios.
+    """
+    if not nombre_raw:
         return ""
-    s = quitar_tildes(str(nationality)).lower()
-    s = re.sub(r"\s+", "", s)
+    s = quitar_tildes(str(nombre_raw)).lower()
+    # palabras a eliminar específicas de ligas
+    s = re.sub(r"\b(league|liga|serie|a|1|one|premier|division|liga1|liga2|the|de|del|of)\b", "", s)
     s = re.sub(r"[^a-z0-9]+", "", s)
     return s.upper()
 
 
-def clave_por_nacionalidad(nombre: str, nationality: str) -> str:
-    """Genera una clave a partir del nombre y la nacionalidad.
+def clave_liga(nombre: str, pais: str) -> str:
+    """Genera una clave canónica para una liga a partir de su nombre y país.
 
-    Útil cuando la columna que acompaña al nombre no es una fecha sino
-    la nacionalidad del jugador.
+    Ejemplo: ('Spanish La Liga', 'Spain') -> 'LALIGAESPAN'
     """
-    inicial, apellido = extraer_inicial_apellido(nombre)
-    nat_key = _normalize_nationality_for_key(nationality)
-    return f"{inicial}{apellido}{nat_key}"
+    name_key = _normalize_league_name_for_key(nombre)
+    country_key = quitar_tildes(str(pais)).upper() if pais else ""
+    country_key = re.sub(r"[^A-Z0-9]+", "", country_key)
+    return f"{name_key}{country_key}"
 
 
 
@@ -307,7 +312,7 @@ def generar_mapeo(*fuentes, umbral=85):
     mapeo = generar_mapeo_df(*fuentes, umbral=umbral)
 
     total = len(mapeo)
-    print(f"Total jugadores únicos: {total}")
+    print(f"Total registros únicos: {total}")
     for _, _, prefijo, _ in _build_source_frames(*fuentes):
         n = mapeo[f'id_{prefijo}'].notna().sum()
         print(f"  Con id_{prefijo}: {n} ({100*n/total:.1f}%)")

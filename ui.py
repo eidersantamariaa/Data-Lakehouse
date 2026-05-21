@@ -106,81 +106,6 @@ def schema(table: str):
         "loc": t.location(),
     }
 
-
-@app.get("/merge/detect/{table}")
-def merge_detect(table: str, umbral: float = 0.5):
-    if catalog is None:
-        return JSONResponse({"error": "Catalog not connected"}, status_code=400)
-    try:
-        import plata as _plata
-        df = _load_table_df(table)
-        grupos = _plata.detectar_solapamientos_agrupados(df, umbral_similitud=umbral)
-        columnas = list(df.columns)
-        return {"columnas": columnas, "grupos": grupos}
-    except Exception as e:
-        print(f"❌ merge detect error: {e}")
-        import traceback
-        traceback.print_exc()
-        return JSONResponse({"error": str(e)}, status_code=400)
-
-
-@app.post("/merge/apply/{table}")
-async def merge_apply(table: str, req: Request):
-    if catalog is None:
-        return JSONResponse({"error": "Catalog not connected"}, status_code=400)
-
-    try:
-        body = await req.json()
-        config = body.get("config") or []
-        target_table = (body.get("target_table") or "").strip()
-
-        if not isinstance(config, list) or len(config) == 0:
-            return JSONResponse({"error": "Config de merge vacia"}, status_code=400)
-
-        if "." not in target_table:
-            return JSONResponse({"error": "target_table debe tener formato namespace.tabla"}, status_code=400)
-
-        df = _load_table_df(table)
-        columnas = set(df.columns)
-
-        for i, entrada in enumerate(config):
-            if not isinstance(entrada, dict):
-                return JSONResponse({"error": f"Grupo {i+1}: formato invalido"}, status_code=400)
-
-            fuentes = entrada.get("fuentes") or []
-            tiebreaker = (entrada.get("tiebreaker") or "").strip()
-
-            if not isinstance(fuentes, list) or len(fuentes) < 2:
-                return JSONResponse({"error": f"Grupo {i+1}: se requieren al menos 2 fuentes"}, status_code=400)
-
-            inexistentes = [c for c in fuentes if c not in columnas]
-            if inexistentes:
-                return JSONResponse({"error": f"Grupo {i+1}: columnas no existen en tabla: {', '.join(inexistentes)}"}, status_code=400)
-
-            if tiebreaker and tiebreaker not in fuentes:
-                return JSONResponse({"error": f"Grupo {i+1}: tiebreaker debe estar dentro de fuentes"}, status_code=400)
-
-        df_merge = limpiar_tabla(df, grupos=config)
-        df_validado, errores = validar_tabla(df_merge)
-        saved = _save_table_df(target_table, df_validado)
-
-        errores_saved = None
-        if isinstance(errores, pd.DataFrame) and not errores.empty:
-            ns, tbl = target_table.split(".", 1)
-            errores_saved = _save_table_df(f"{ns}.{tbl}_errores", errores)
-
-        return {
-            "status": "ok",
-            "table": saved["table"],
-            "rows": saved["rows"],
-            "cols": saved["cols"],
-            "errores_rows": int(len(errores)) if isinstance(errores, pd.DataFrame) else 0,
-            "errores_table": errores_saved["table"] if errores_saved else None,
-        }
-    except Exception as e:
-        print(f"❌ merge apply error: {e}")
-        return JSONResponse({"error": str(e)}, status_code=400)
-
 # ── Preview ahora acepta limit como query param ─────────────────────────────
 @app.get("/preview/{table}")
 def preview(table: str, limit: int = 50):
@@ -660,4 +585,78 @@ async def matching_run(req: Request):
             "unified_preview": _clean_preview(tabla_final),
         }
     except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    
+@app.get("/merge/detect/{table}")
+def merge_detect(table: str, umbral: float = 0.5):
+    if catalog is None:
+        return JSONResponse({"error": "Catalog not connected"}, status_code=400)
+    try:
+        import plata as _plata
+        df = _load_table_df(table)
+        grupos = _plata.detectar_solapamientos_agrupados(df, umbral_similitud=umbral)
+        columnas = list(df.columns)
+        return {"columnas": columnas, "grupos": grupos}
+    except Exception as e:
+        print(f"❌ merge detect error: {e}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.post("/merge/apply/{table}")
+async def merge_apply(table: str, req: Request):
+    if catalog is None:
+        return JSONResponse({"error": "Catalog not connected"}, status_code=400)
+
+    try:
+        body = await req.json()
+        config = body.get("config") or []
+        target_table = (body.get("target_table") or "").strip()
+
+        if not isinstance(config, list) or len(config) == 0:
+            return JSONResponse({"error": "Config de merge vacia"}, status_code=400)
+
+        if "." not in target_table:
+            return JSONResponse({"error": "target_table debe tener formato namespace.tabla"}, status_code=400)
+
+        df = _load_table_df(table)
+        columnas = set(df.columns)
+
+        for i, entrada in enumerate(config):
+            if not isinstance(entrada, dict):
+                return JSONResponse({"error": f"Grupo {i+1}: formato invalido"}, status_code=400)
+
+            fuentes = entrada.get("fuentes") or []
+            tiebreaker = (entrada.get("tiebreaker") or "").strip()
+
+            if not isinstance(fuentes, list) or len(fuentes) < 2:
+                return JSONResponse({"error": f"Grupo {i+1}: se requieren al menos 2 fuentes"}, status_code=400)
+
+            inexistentes = [c for c in fuentes if c not in columnas]
+            if inexistentes:
+                return JSONResponse({"error": f"Grupo {i+1}: columnas no existen en tabla: {', '.join(inexistentes)}"}, status_code=400)
+
+            if tiebreaker and tiebreaker not in fuentes:
+                return JSONResponse({"error": f"Grupo {i+1}: tiebreaker debe estar dentro de fuentes"}, status_code=400)
+
+        df_merge = limpiar_tabla(df, grupos=config)
+        df_validado, errores = validar_tabla(df_merge)
+        saved = _save_table_df(target_table, df_validado)
+
+        errores_saved = None
+        if isinstance(errores, pd.DataFrame) and not errores.empty:
+            ns, tbl = target_table.split(".", 1)
+            errores_saved = _save_table_df(f"{ns}.{tbl}_errores", errores)
+
+        return {
+            "status": "ok",
+            "table": saved["table"],
+            "rows": saved["rows"],
+            "cols": saved["cols"],
+            "errores_rows": int(len(errores)) if isinstance(errores, pd.DataFrame) else 0,
+            "errores_table": errores_saved["table"] if errores_saved else None,
+        }
+    except Exception as e:
+        print(f"❌ merge apply error: {e}")
         return JSONResponse({"error": str(e)}, status_code=400)
