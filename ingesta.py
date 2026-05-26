@@ -94,17 +94,20 @@ def get_spark():
     return builder.getOrCreate()
 
 
-def run_ingesta(config, test_mode=False):
+def run_ingesta(config, test_mode=False, namespace=None):
     spark = get_spark()
-    spark.sql(f"CREATE NAMESPACE IF NOT EXISTS players.{config.NAMESPACE}")
+
+    effective_namespace = namespace if namespace is not None else config.NAMESPACE
+    
+    spark.sql(f"CREATE NAMESPACE IF NOT EXISTS players.{effective_namespace}")
 
     data = config.get_data(test_mode=test_mode)
     processed = []
 
     for table_name, records in data.items():
         print(f"Processing {table_name}... ({len(records)} records{' [test mode]' if test_mode else ''})")
-        full_table = f"players.{config.NAMESPACE}.{config.API}_{table_name}"
-        
+        full_table = f"players.{effective_namespace}.{config.API}_{table_name}"
+
         df_new = spark.read.json(
             spark.sparkContext.parallelize([json.dumps(r) for r in records])
         )
@@ -132,7 +135,7 @@ def run_ingesta(config, test_mode=False):
                 print(f"⚠ No merge key found for {full_table}, appending rows instead of MERGE")
                 df_new.writeTo(full_table).append()
                 accion = "APPEND"
-                write_audit_log(spark, config.NAMESPACE, f"{table_name}_bronce", accion, len(records))
+                write_audit_log(spark, effective_namespace, f"{table_name}_bronce", accion, len(records))
                 print(f"✅ {table_name} procesado ({accion})")
                 print(f"🔧 Compactando {full_table}...")
                 spark.sql(f"""
@@ -179,7 +182,7 @@ def run_ingesta(config, test_mode=False):
             """)
             accion = "MERGE"
 
-        write_audit_log(spark, config.NAMESPACE, f"{table_name}_bronce", accion, len(records))
+        write_audit_log(spark, effective_namespace, f"{table_name}_bronce", accion, len(records))
         print(f"✅ {table_name} procesado ({accion})")
         processed.append({"table": table_name, "rows": len(records), "action": accion})
 
