@@ -2,6 +2,7 @@ import pandas as pd
 import re
 from datetime import datetime
 from rapidfuzz import fuzz
+from pyspark.sql import types as T
 
 errores_log = []
 
@@ -420,3 +421,56 @@ def limpiar_tabla(df, grupos=None):
     print(f"Total filas           : {len(df)}")
 
     return df
+
+#-----------------------------------------De DataFrame a spark-----------------------------------------
+
+def pandas_dtype_to_spark(dtype):
+
+    if pd.api.types.is_integer_dtype(dtype):
+        return T.LongType()
+
+    elif pd.api.types.is_float_dtype(dtype):
+        return T.DoubleType()
+
+    elif pd.api.types.is_bool_dtype(dtype):
+        return T.BooleanType()
+
+    elif pd.api.types.is_datetime64_any_dtype(dtype):
+        return T.TimestampType()
+
+    else:
+        return T.StringType()
+
+
+def pandas_to_spark(spark_session, df_pandas):
+
+    df_fixed = df_pandas.copy()
+
+    for col in df_fixed.columns:
+
+        if df_fixed[col].dtype == object:
+
+            df_fixed[col] = df_fixed[col].where(
+                df_fixed[col].notna(),
+                other=None
+            )
+
+            df_fixed[col] = df_fixed[col].apply(
+                lambda x: str(x) if x is not None else None
+            )
+
+    fields = [
+        T.StructField(
+            col,
+            pandas_dtype_to_spark(df_fixed[col].dtype),
+            nullable=True
+        )
+        for col in df_fixed.columns
+    ]
+
+    schema = T.StructType(fields)
+
+    return spark_session.createDataFrame(
+        df_fixed,
+        schema=schema
+    )
