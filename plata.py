@@ -278,6 +278,19 @@ def _votar(valores_norm):
     mayoria = [k for k, n in conteo.items() if n >= 2]
     return originales[mayoria[0]] if mayoria else None
 
+def _primer_no_nulo(valores_norm, preferencia=None):
+    if preferencia is not None:
+        for col in preferencia:
+            valor = valores_norm.get(col)
+            if not _es_nulo(valor):
+                return valor
+
+    for valor in valores_norm.values():
+        if not _es_nulo(valor):
+            return valor
+
+    return None
+
 # ── Validación ───────────────────────────────────────────────────────────────
 
 def validar_tabla(df):
@@ -382,7 +395,7 @@ def limpiar_tabla(df, grupos=None):
             if ganador is not None:
                 return ganador
 
-            return valores_norm.get(tiebreaker)
+            return _primer_no_nulo(valores_norm, [tiebreaker])
 
         df[col_final] = df.apply(resolver_fila, axis=1)
         cols_a_eliminar.extend(fuentes)
