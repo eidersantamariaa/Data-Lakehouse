@@ -12,7 +12,7 @@ import math
 
 from IDMatching import generar_mapeo_df, unir_fuentes_df, clave_fecha_completa, clave_solo_anio
 from plata import validar_tabla, limpiar_tabla
-
+from funciones_mapeo import load_table_df, save_table_df
 
 app = FastAPI()
 catalog = None
@@ -55,104 +55,11 @@ def _write_audit_log(namespace: str, table_name: str, accion: str, num_registros
         return False
 
 
-def _load_table_df(table: str):
-    ns, tbl_name = table.split(".", 1)
-    t = catalog.load_table((ns, tbl_name))
-    return t.scan().to_arrow().to_pandas()
+def _load_table_df(table):
+    return load_table_df(catalog, table)
 
-
-def _save_table_df(table_name: str, df):
-    target_ns, target_tbl = table_name.split(".", 1)
-    # Work on a copy and ensure columns that are entirely null get a concrete type
-    df_copy = df.copy()
-    for c in df_copy.columns:
-        try:
-            if df_copy[c].isna().all():
-                df_copy[c] = pd.Series([None] * len(df_copy), dtype="string")
-        except Exception:
-            # In case isna() fails for exotic dtypes, coerce to string
-            df_copy[c] = df_copy[c].astype("string")
-    # Build Arrow table from pandas (preserve column order)
-    arrow_table = pa.Table.from_pandas(df_copy, preserve_index=False)
-
-    try:
-        catalog.create_namespace(target_ns)
-    except Exception:
-        pass
-
-    # Try to create table if it doesn't exist
-    try:
-        catalog.create_table(
-            (target_ns, target_tbl),
-            schema=arrow_table.schema,
-        )
-    except Exception as create_err:
-        # table probably exists
-        print(f"⚠ table create skipped for {table_name}: {create_err}")
-
-    target_t = catalog.load_table((target_ns, target_tbl))
-
-    # If the existing table has a different schema, merge by name (union_by_name)
-    try:
-        existing_schema = target_t.schema()
-        existing_names = [f.name for f in existing_schema.fields]
-        new_names = list(arrow_table.column_names)
-
-        if set(existing_names) != set(new_names):
-            # preserve existing order, append new columns from incoming df
-            combined = list(dict.fromkeys(existing_names + new_names))
-            # Build a pandas DataFrame aligned to the combined columns so pyarrow will fill missing with nulls
-            aligned = pd.DataFrame()
-            for col in combined:
-                if col in df.columns:
-                    aligned[col] = df[col]
-                else:
-                    aligned[col] = pd.NA
-            # Convert any all-null columns to string to avoid pa.null() fields
-            for c in aligned.columns:
-                try:
-                    if aligned[c].isna().all():
-                        aligned[c] = pd.Series([None] * len(aligned), dtype="string")
-                except Exception:
-                    aligned[c] = aligned[c].astype("string")
-            arrow_table = pa.Table.from_pandas(aligned, preserve_index=False)
-
-    except Exception as merge_err:
-        print(f"⚠ schema union attempted but failed for {table_name}: {merge_err}")
-
-    # Try to update table schema by name first so Iceberg knows about new columns
-    try:
-        try:
-            upd = target_t.update_schema()
-            upd.union_by_name(arrow_table.schema)
-            upd.commit()
-            print(f"✓ schema updated by union_by_name for {table_name}")
-        except Exception as upd_err:
-            # If update failed due to format-version constraints, try recreate
-            msg = str(upd_err).lower()
-            print(f"⚠ schema union failed for {table_name}: {upd_err}")
-            if 'format' in msg or 'format-version' in msg or 'requires' in msg:
-                try:
-                    print(f"⚠ attempting to recreate table {table_name} with new schema")
-                    catalog.drop_table((target_ns, target_tbl))
-                except Exception as drop_err:
-                    print(f"⚠ drop table failed: {drop_err}")
-                try:
-                    catalog.create_table((target_ns, target_tbl), schema=arrow_table.schema)
-                    target_t = catalog.load_table((target_ns, target_tbl))
-                    print(f"✓ table recreated: {table_name}")
-                except Exception as create_err:
-                    print(f"✗ recreate failed for {table_name}: {create_err}")
-    except Exception as final_err:
-        print(f"⚠ schema update/recreate unexpected error for {table_name}: {final_err}")
-
-    # Overwrite table with arrow_table (now schema-matched)
-    target_t.overwrite(arrow_table)
-    return {
-        "table": table_name,
-        "rows": len(df),
-        "cols": df.columns.tolist(),
-    }
+def _save_table_df(table_name, df):
+    return save_table_df(catalog, table_name, df)
 
 @app.post("/connect")
 async def connect_catalog(req: Request):

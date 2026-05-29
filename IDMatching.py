@@ -5,7 +5,7 @@ import math
 import re
 from rapidfuzz import process, fuzz
 from ingesta import get_spark, get_catalog
-from funciones_mapeo import extraer_inicial_apellido, generar_clave, quitar_tildes
+from funciones_mapeo import extraer_inicial_apellido, generar_clave, quitar_tildes, load_table_df, save_table_df
 from limpieza import normalize_text, normalize_date, normalize_height, normalize_weight, normalize_currency, normalize_position
 
 spark = None
@@ -23,17 +23,10 @@ def _ensure_spark():
 # ── Helpers de carga / guardado ──────────────────────────────────────────────
 
 def _load_table(table_name: str, catalog):
-    """Carga una tabla como DataFrame pandas usando PyIceberg."""
-    ns, tbl = table_name.split(".", 1)
-    return catalog.load_table((ns, tbl)).scan().to_arrow().to_pandas()
-
+    return load_table_df(catalog, table_name)
 
 def _save_table(table_name: str, df: pd.DataFrame, catalog):
-    """Guarda un DataFrame usando PyIceberg, igual que _save_table_df en ui.py."""
-    import ui as _ui_module
-    _ui_module.catalog = catalog
-    from ui import _save_table_df
-    return _save_table_df(table_name, df)
+    return save_table_df(catalog, table_name, df)
 
 
 # ── Función principal ────────────────────────────────────────────────────────
