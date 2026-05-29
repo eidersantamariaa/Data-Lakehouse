@@ -40,14 +40,18 @@ def _load_table(table_name: str, spark=None):
 
 
 def _save_table(table_name: str, df: pd.DataFrame, spark=None):
-    """
-    Guarda un DataFrame.
-    - Si se pasa spark, escribe en Iceberg con writeTo().
-    - Si no, intenta usar el catalog de ui.py como fallback.
-    """
     if spark is not None:
+        # Castear columnas completamente nulas a string para que Spark pueda inferir el schema
+        df_copy = df.copy()
+        for col in df_copy.columns:
+            try:
+                if df_copy[col].isna().all():
+                    df_copy[col] = pd.Series([None] * len(df_copy), dtype="string")
+            except Exception:
+                df_copy[col] = df_copy[col].astype("string")
+
         (
-            spark.createDataFrame(df)
+            spark.createDataFrame(df_copy)
                  .writeTo(table_name)
                  .using("iceberg")
                  .createOrReplace()
