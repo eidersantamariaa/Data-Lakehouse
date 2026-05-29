@@ -19,6 +19,144 @@ def _ensure_spark():
             spark = None
     return spark
 
+
+# ── Helpers de carga / guardado ──────────────────────────────────────────────
+
+def _load_table(table_name: str, spark=None):
+    """
+    Carga una tabla como DataFrame pandas.
+    - Si se pasa spark, usa spark.table().toPandas().
+    - Si no, intenta usar el catalog de ui.py como fallback.
+    """
+    if spark is not None:
+        return spark.table(table_name).toPandas()
+    try:
+        from ui import _load_table_df
+        return _load_table_df(table_name)
+    except Exception:
+        raise RuntimeError(
+            f"No se pudo cargar '{table_name}': pasa una SparkSession o conecta el catalog."
+        )
+
+
+def _save_table(table_name: str, df: pd.DataFrame, spark=None):
+    """
+    Guarda un DataFrame.
+    - Si se pasa spark, escribe en Iceberg con writeTo().
+    - Si no, intenta usar el catalog de ui.py como fallback.
+    """
+    if spark is not None:
+        (
+            spark.createDataFrame(df)
+                 .writeTo(table_name)
+                 .using("iceberg")
+                 .createOrReplace()
+        )
+        return table_name
+    try:
+        from ui import _save_table_df
+        return _save_table_df(table_name, df)
+    except Exception:
+        raise RuntimeError(
+            f"No se pudo guardar '{table_name}': pasa una SparkSession o conecta el catalog."
+        )
+
+
+# ── Función principal ────────────────────────────────────────────────────────
+
+def run_matching(sources: list, spark=None, umbral: float = 85,
+                 mapping_table: str = None, unified_table: str = None):
+    """
+    Orquesta el flujo completo de matching entre N fuentes.
+
+    Parámetros
+    ----------
+    sources : list[dict]
+        Cada dict describe una fuente con las claves:
+            table     : nombre completo de la tabla (ej. "players.mock.transfermarkt_players")
+            name_col  : columna con el nombre del jugador/equipo/etc.
+            date_col  : columna con la fecha de nacimiento/fundación/etc.
+            id_col    : columna de ID propio (None si la fuente no tiene ID nativo)
+            prefix    : prefijo corto para identificar la fuente (ej. "tm", "ts", "fb")
+            key_mode  : "full_date" (por defecto) o "year"
+            umbral    : umbral de similitud específico para esta fuente (hereda el global si no se indica)
+    spark : SparkSession, opcional
+        Si se pasa, se usa para cargar y guardar tablas. Si no, se usa el catalog.
+    umbral : float
+        Umbral global de similitud para el fuzzy matching (por defecto 85).
+    mapping_table : str, opcional
+        Nombre de tabla donde guardar el mapeo de IDs.
+    unified_table : str, opcional
+        Nombre de tabla donde guardar la tabla unificada.
+
+    Retorna
+    -------
+    (mapeo, tabla_final) : tuple[pd.DataFrame, pd.DataFrame]
+
+    Ejemplo
+    -------
+    sources = [
+        {"table": "players.mock.transfermarkt_players", "name_col": "name",
+         "date_col": "dateOfBirth", "id_col": "id", "prefix": "tm",
+         "key_mode": "full_date", "umbral": 88},
+        {"table": "players.mock.fbref_players", "name_col": "player",
+         "date_col": "born", "id_col": None, "prefix": "fb",
+         "key_mode": "year", "umbral": 75},
+    ]
+    mapeo, tabla_final = run_matching(sources, spark=spark, umbral=85,
+                                      mapping_table="players.mock.players_mapping",
+                                      unified_table="players.mock.players_unified")
+    """
+
+    # ── Paso 1: cargar tablas y construir source_frames ───────────────────────
+    source_frames = []
+    for src in sources:
+        name_col   = src["name_col"]
+        date_col   = src["date_col"]
+        id_col     = src.get("id_col") or None
+        prefix     = src["prefix"]
+        key_mode   = src.get("key_mode", "full_date")
+        src_umbral = float(src.get("umbral", umbral))
+        key_fn     = clave_solo_anio if key_mode == "year" else clave_fecha_completa
+
+        df = _load_table(src["table"], spark)
+        source_frames.append((df, name_col, date_col, id_col, prefix, key_fn, src_umbral))
+
+    # ── Paso 2: generar mapeo de IDs ──────────────────────────────────────────
+    mapeo = generar_mapeo_df(*source_frames, umbral=umbral)
+    if mapping_table:
+        _save_table(mapping_table, mapeo, spark)
+
+    # ── Paso 3: preparar source_join_frames ───────────────────────────────────
+    # Para fuentes sin id_col nativo se genera _clave como ID sintético,
+    # igual que hace el endpoint matching_run de ui.py.
+    source_join_frames = []
+    for src, frame in zip(sources, source_frames):
+        df       = frame[0].copy()
+        name_col = src["name_col"]
+        date_col = src["date_col"]
+        id_col   = src.get("id_col") or None
+        prefix   = src["prefix"]
+        key_mode = src.get("key_mode", "full_date")
+        key_fn   = clave_solo_anio if key_mode == "year" else clave_fecha_completa
+
+        if not id_col:
+            df["_clave"] = df.apply(
+                lambda r, fn=key_fn, cn=name_col, cf=date_col: fn(r.get(cn), r.get(cf)),
+                axis=1,
+            )
+            id_col = "_clave"
+
+        source_join_frames.append((df, id_col, prefix))
+
+    # ── Paso 4: unir fuentes ──────────────────────────────────────────────────
+    tabla_final = unir_fuentes_df(mapeo, *source_join_frames)
+    if unified_table:
+        _save_table(unified_table, tabla_final, spark)
+
+    return mapeo, tabla_final
+
+
 # --- Funciones de clave específicas para jugadores --------------------------------
 
 # Función para fuentes con fecha completa
@@ -57,6 +195,7 @@ def clave_equipo_solo_anio(nombre, fecha):
     name_key = _normalize_team_name_for_key(nombre)
     return f"{name_key}{anio}"
 
+
 # --- Funciones de clave específicas para ligas --------------------------------
 def _normalize_league_name_for_key(nombre_raw: str) -> str:
     """Normaliza nombres de ligas para generar claves comparables.
@@ -67,7 +206,6 @@ def _normalize_league_name_for_key(nombre_raw: str) -> str:
     if not nombre_raw:
         return ""
     s = quitar_tildes(str(nombre_raw)).lower()
-    # palabras a eliminar específicas de ligas y adjetivos de país/artículos
     s = re.sub(r"\b(spanish|english|german|italian|french|scottish|dutch|irish)\b", "", s)
     s = re.sub(r"[^a-z0-9]+", "", s)
     return s.upper()
@@ -84,11 +222,7 @@ def clave_liga(nombre: str, pais: str) -> str:
     return f"{name_key}{country_key}"
 
 
-
 # ── Aplanado de valores complejos ────────────────────────────────────────────
-# Convierte dicts/listas en strings comparables para que detectar_solapamientos
-# pueda hacer fuzzy matching sobre ellos.  Se aplica en unir_fuentes_df antes
-# de devolver el resultado, de modo que limpieza.py recibe siempre strings planos.
 
 def _aplanar_valor(v):
     """
@@ -108,7 +242,6 @@ def _aplanar_valor(v):
         )
     if isinstance(v, (list, tuple, set)):
         return ", ".join(str(i) for i in v if i is not None)
-    # numpy arrays y similares
     if hasattr(v, "tolist") and not isinstance(v, (str, bytes)):
         try:
             return _aplanar_valor(v.tolist())
@@ -133,7 +266,7 @@ def _es_nulo(v):
 def _aplanar_df(df: pd.DataFrame) -> pd.DataFrame:
     """
     Aplana in-place todas las columnas de `df` que contengan dicts, listas
-    o arrays en alguna de sus filas.  El resto de columnas no se tocan.
+    o arrays en alguna de sus filas. El resto de columnas no se tocan.
     """
     # Paso 1: expandir todos los dicts en columnas nuevas
     for col in list(df.columns):
@@ -147,7 +280,7 @@ def _aplanar_df(df: pd.DataFrame) -> pd.DataFrame:
         serie = df[col].dropna()
         if not serie.empty and serie.apply(
             lambda x: isinstance(x, (list, tuple, set))
-            or (hasattr(x, "tolist") and not isinstance(x, (str, bytes)))  # ← numpy arrays
+            or (hasattr(x, "tolist") and not isinstance(x, (str, bytes)))
         ).any():
             df[col] = df[col].apply(
                 lambda v: extraer_representativo(v) if not _es_nulo(v) else None
@@ -155,7 +288,8 @@ def _aplanar_df(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
-# ── Metodos normalizar ─────────────────────────────────────────────────────
+
+# ── Métodos de normalización ──────────────────────────────────────────────────
 
 def _inferir_normalizador(col: str):
     """Infiere la función de normalización por el nombre de la columna."""
@@ -170,13 +304,13 @@ def _inferir_normalizador(col: str):
         return normalize_date
     if any(x in c for x in ("position", "pos")):
         return normalize_position
-    return normalize_text  # fallback para strings
+    return normalize_text
+
 
 def _normalizar_df(df: pd.DataFrame) -> pd.DataFrame:
     for col in df.columns:
         if col == 'id':
             continue
-        # Solo normalizar columnas string, saltar numéricas y booleanas
         if df[col].dtype not in (object, "string"):
             continue
         serie = df[col].dropna()
@@ -188,7 +322,8 @@ def _normalizar_df(df: pd.DataFrame) -> pd.DataFrame:
         )
     return df
 
-# ── Pipeline de matching ─────────────────────────────────────────────────────
+
+# ── Pipeline de matching ──────────────────────────────────────────────────────
 
 def _build_source_frames(*fuentes):
     dfs_con_clave = []
@@ -281,11 +416,6 @@ def unir_fuentes_df(mapeo, *fuentes):
     resultado = resultado.rename(columns={'id_propio': 'id'})
     resultado = resultado[['id'] + [c for c in resultado.columns if c != 'id']]
 
-    # ── APLANADO ──────────────────────────────────────────────────────────────
-    # Convertir dicts/listas en strings antes de devolver el DataFrame, para que
-    # detectar_solapamientos y el fuzzy matching de limpieza.py funcionen
-    # correctamente. Ejemplo:
-    #   {'contractExpires':'2030-06-30','name':'Napoli'}  →  'contractExpires=2030-06-30, name=Napoli'
     resultado = _aplanar_df(resultado)
     resultado = _normalizar_df(resultado)
 
@@ -349,7 +479,7 @@ def unir_fuentes(mapeo, *fuentes):
     if hasattr(mapeo, "toPandas"):
         mapeo = mapeo.toPandas()
 
-    resultado = unir_fuentes_df(mapeo, *fuentes)  # ya imprime el resumen + aplana
+    resultado = unir_fuentes_df(mapeo, *fuentes)
 
     spark_runtime = _ensure_spark()
     if spark_runtime is None:
@@ -367,9 +497,9 @@ def unir_fuentes(mapeo, *fuentes):
     ]
     return spark_runtime.read.json(spark_runtime.sparkContext.parallelize(filas_json))
 
-import re
 
-# Claves que suelen contener el nombre principal en cualquier API deportiva
+# ── Helpers de representación y expansión ────────────────────────────────────
+
 _CLAVES_NOMBRE = {
     "name", "nombre", "player", "team", "club", "title",
     "label", "strname", "strplayer", "strteam", "fullname"
@@ -380,29 +510,28 @@ def _parece_nombre(v):
     s = str(v).strip()
     if not s or s.lower() == "none":
         return False
-    if re.fullmatch(r"\d+", s):               # ID numérico
+    if re.fullmatch(r"\d+", s):
         return False
-    if re.fullmatch(r"\d{4}-\d{2}-\d{2}.*", s):  # fecha
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}.*", s):
         return False
     if re.fullmatch(r"\d{4}-\d{2}-\d{2}", s[:10]):
         return False
     return True
 
+
 def extraer_representativo(v):
     """
     Extrae el string más representativo de un valor complejo.
-    
+
     dict  → busca clave nombre conocida, si no la hay toma
             el valor string más largo que parezca un nombre
     list  → primer elemento que parezca un nombre
     resto → devuelve tal cual
     """
     if isinstance(v, dict):
-        # 1. Buscar clave prioritaria (case-insensitive)
         for k, val in v.items():
             if k.lower() in _CLAVES_NOMBRE and val and _parece_nombre(val):
                 return str(val).strip()
-        # 2. Fallback: el string más largo que parezca un nombre
         candidatos = [
             str(val).strip()
             for val in v.values()
@@ -421,6 +550,7 @@ def extraer_representativo(v):
 
     return v
 
+
 def _expandir_dict_col(df: pd.DataFrame, col: str) -> pd.DataFrame:
     """
     Si col contiene dicts, crea nuevas columnas col_key1, col_key2...
@@ -434,7 +564,6 @@ def _expandir_dict_col(df: pd.DataFrame, col: str) -> pd.DataFrame:
         lambda v: v if isinstance(v, dict) else {}
     ).apply(pd.Series).add_prefix(f"{col}_")
 
-    # Solo columnas con al menos un valor no nulo
     expandida = expandida.loc[:, expandida.notna().any()]
 
     return pd.concat([df.drop(columns=[col]), expandida], axis=1)
