@@ -38,26 +38,34 @@ def _load_table(table_name: str, spark=None):
             f"No se pudo cargar '{table_name}': pasa una SparkSession o conecta el catalog."
         )
 
+def _sanitize_for_spark(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Limpia un DataFrame pandas para que Spark pueda inferir el schema sin errores.
+    - Columnas completamente nulas → dtype string
+    - Columnas con dicts/listas (incluso vacíos) → json string
+    """
+    df = df.copy()
+    for col in df.columns:
+        try:
+            serie = df[col].dropna()
+            if df[col].isna().all():
+                df[col] = pd.Series([None] * len(df), dtype="string")
+            elif not serie.empty and serie.apply(
+                lambda x: isinstance(x, (dict, list, tuple, set))
+            ).any():
+                df[col] = df[col].apply(
+                    lambda v: json.dumps(v) if isinstance(v, (dict, list, tuple, set))
+                    else (None if _es_nulo(v) else v)
+                )
+        except Exception:
+            df[col] = df[col].astype("string")
+    return df
+
 
 def _save_table(table_name: str, df: pd.DataFrame, spark=None):
     if spark is not None:
-        df_copy = df.copy()
-        for col in df_copy.columns:
-            try:
-                serie = df_copy[col].dropna()
-                # Columnas completamente nulas → string
-                if df_copy[col].isna().all():
-                    df_copy[col] = pd.Series([None] * len(df_copy), dtype="string")
-                # Columnas con dicts/listas (incluidos dicts vacíos) → string
-                elif not serie.empty and serie.apply(lambda x: isinstance(x, (dict, list))).any():
-                    df_copy[col] = df_copy[col].apply(
-                        lambda v: str(v) if isinstance(v, (dict, list)) else v
-                    )
-            except Exception:
-                df_copy[col] = df_copy[col].astype("string")
-
         (
-            spark.createDataFrame(df_copy)
+            spark.createDataFrame(_sanitize_for_spark(df))
                  .writeTo(table_name)
                  .using("iceberg")
                  .createOrReplace()
