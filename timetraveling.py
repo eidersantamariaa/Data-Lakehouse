@@ -17,6 +17,8 @@ from datetime import datetime, timezone
 from typing import Any
 import math
 
+from funciones_mapeo import split_table_ref
+
 log = logging.getLogger("timetraveling")
 
 
@@ -82,10 +84,8 @@ class TimeTraveler:
 
     def _load(self, table: str):
         """Carga una tabla Iceberg a partir de 'namespace.tabla'."""
-        parts = table.split(".", 1)
-        if len(parts) != 2:
-            raise ValueError(f"Formato invalido: usa 'namespace.tabla', recibido '{table}'")
-        return self.catalog.load_table(tuple(parts))
+        ns, tbl = split_table_ref(table)
+        return self.catalog.load_table((ns, tbl))
 
     # ── 1. Historial ─────────────────────────────────────────────────────────
 

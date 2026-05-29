@@ -83,13 +83,19 @@ def generar_clave(nombre_raw: str, fecha_raw: str) -> str:
     fecha = normalize_date(fecha_raw)
     return f"{inicial}{apellido}{fecha}"  # → OSancet25042000
 
+
+def split_table_ref(table: str) -> tuple[str, str]:
+    if "." not in table:
+        raise ValueError(f"Formato invalido: usa namespace.tabla, recibido '{table}'")
+    return table.rsplit(".", 1)
+
 def load_table_df(catalog, table: str) -> pd.DataFrame:
-    ns, tbl = table.split(".", 1)
+    ns, tbl = split_table_ref(table)
     return catalog.load_table((ns, tbl)).scan().to_arrow().to_pandas()
 
 
 def save_table_df(catalog, table_name: str, df: pd.DataFrame):
-    target_ns, target_tbl = table_name.split(".", 1)
+    target_ns, target_tbl = split_table_ref(table_name)
     df_copy = df.copy()
     for c in df_copy.columns:
         try:
