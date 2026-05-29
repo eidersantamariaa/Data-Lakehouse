@@ -41,12 +41,18 @@ def _load_table(table_name: str, spark=None):
 
 def _save_table(table_name: str, df: pd.DataFrame, spark=None):
     if spark is not None:
-        # Castear columnas completamente nulas a string para que Spark pueda inferir el schema
         df_copy = df.copy()
         for col in df_copy.columns:
             try:
+                serie = df_copy[col].dropna()
+                # Columnas completamente nulas → string
                 if df_copy[col].isna().all():
                     df_copy[col] = pd.Series([None] * len(df_copy), dtype="string")
+                # Columnas con dicts/listas (incluidos dicts vacíos) → string
+                elif not serie.empty and serie.apply(lambda x: isinstance(x, (dict, list))).any():
+                    df_copy[col] = df_copy[col].apply(
+                        lambda v: str(v) if isinstance(v, (dict, list)) else v
+                    )
             except Exception:
                 df_copy[col] = df_copy[col].astype("string")
 
@@ -64,7 +70,6 @@ def _save_table(table_name: str, df: pd.DataFrame, spark=None):
         raise RuntimeError(
             f"No se pudo guardar '{table_name}': pasa una SparkSession o conecta el catalog."
         )
-
 
 # ── Función principal ────────────────────────────────────────────────────────
 
