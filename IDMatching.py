@@ -4,7 +4,7 @@ import json
 import math
 import re
 from rapidfuzz import process, fuzz
-from ingesta import get_spark, get_catalog
+from ingesta import get_spark
 from funciones_mapeo import extraer_inicial_apellido, generar_clave, quitar_tildes, load_table_df, save_table_df
 from limpieza import normalize_text, normalize_date, normalize_height, normalize_weight, normalize_currency, normalize_position
 

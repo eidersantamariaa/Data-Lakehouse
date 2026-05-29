@@ -1,6 +1,7 @@
 import pandas as pd
 from rapidfuzz import process, fuzz
 import unicodedata
+import pyarrow as pa
 import re
 from ingesta import get_spark
 
