@@ -4,7 +4,7 @@ import json
 import math
 import re
 from rapidfuzz import process, fuzz
-from ingesta import get_spark
+from ingesta import get_spark, get_catalog
 from funciones_mapeo import extraer_inicial_apellido, generar_clave, quitar_tildes
 from limpieza import normalize_text, normalize_date, normalize_height, normalize_weight, normalize_currency, normalize_position
 
@@ -22,40 +22,23 @@ def _ensure_spark():
 
 # ── Helpers de carga / guardado ──────────────────────────────────────────────
 
-def _load_table(table_name: str, spark=None):
-    """
-    Carga una tabla como DataFrame pandas.
-    - Si se pasa spark, usa spark.table().toPandas().
-    - Si no, intenta usar el catalog de ui.py como fallback.
-    """
-    if spark is not None:
-        return spark.table(table_name).toPandas()
-    try:
-        from ui import _load_table_df
-        return _load_table_df(table_name)
-    except Exception:
-        raise RuntimeError(
-            f"No se pudo cargar '{table_name}': pasa una SparkSession o conecta el catalog."
-        )
+def _load_table(table_name: str, catalog):
+    """Carga una tabla como DataFrame pandas usando PyIceberg."""
+    ns, tbl = table_name.split(".", 1)
+    return catalog.load_table((ns, tbl)).scan().to_arrow().to_pandas()
 
-def _save_table(table_name: str, df: pd.DataFrame, spark=None, catalog=None):
-    if catalog is None:
-        raise RuntimeError(f"No se pudo guardar '{table_name}': pasa catalog.")
-    
-    # 1. Guarda con PyIceberg (igual que ui.py)
+
+def _save_table(table_name: str, df: pd.DataFrame, catalog):
+    """Guarda un DataFrame usando PyIceberg, igual que _save_table_df en ui.py."""
     import ui as _ui_module
     _ui_module.catalog = catalog
     from ui import _save_table_df
-    _save_table_df(table_name, df)
+    return _save_table_df(table_name, df)
 
-    # 2. Devuelve como Spark DataFrame si se pasa spark
-    if spark is not None:
-        return spark.table(table_name)
-    return df
 
 # ── Función principal ────────────────────────────────────────────────────────
 
-def run_matching(sources: list, umbral: float = 85,
+def run_matching(sources: list, catalog=None, umbral: float = 85,
                  mapping_table: str = None, unified_table: str = None):
     """
     Orquesta el flujo completo de matching entre N fuentes.
@@ -71,8 +54,8 @@ def run_matching(sources: list, umbral: float = 85,
             prefix    : prefijo corto para identificar la fuente (ej. "tm", "ts", "fb")
             key_mode  : "full_date" (por defecto) o "year"
             umbral    : umbral de similitud específico para esta fuente (hereda el global si no se indica)
-    spark : SparkSession, opcional
-        Si se pasa, se usa para cargar y guardar tablas. Si no, se usa el catalog.
+    catalog : PyIceberg catalog
+        Catalog para cargar y guardar tablas (igual que ui.py).
     umbral : float
         Umbral global de similitud para el fuzzy matching (por defecto 85).
     mapping_table : str, opcional
@@ -94,10 +77,12 @@ def run_matching(sources: list, umbral: float = 85,
          "date_col": "born", "id_col": None, "prefix": "fb",
          "key_mode": "year", "umbral": 75},
     ]
-    mapeo, tabla_final = run_matching(sources, spark=spark, umbral=85,
+    mapeo, tabla_final = run_matching(sources, catalog=get_catalog(), umbral=85,
                                       mapping_table="players.mock.players_mapping",
                                       unified_table="players.mock.players_unified")
     """
+    if catalog is None:
+        raise RuntimeError("Pasa un catalog: run_matching(sources, catalog=get_catalog(), ...)")
 
     # ── Paso 1: cargar tablas y construir source_frames ───────────────────────
     source_frames = []
@@ -110,13 +95,13 @@ def run_matching(sources: list, umbral: float = 85,
         src_umbral = float(src.get("umbral", umbral))
         key_fn     = clave_solo_anio if key_mode == "year" else clave_fecha_completa
 
-        df = _load_table(src["table"], spark)
+        df = _load_table(src["table"], catalog)
         source_frames.append((df, name_col, date_col, id_col, prefix, key_fn, src_umbral))
 
     # ── Paso 2: generar mapeo de IDs ──────────────────────────────────────────
     mapeo = generar_mapeo_df(*source_frames, umbral=umbral)
     if mapping_table:
-        _save_table(mapping_table, mapeo, spark)
+        _save_table(mapping_table, mapeo, catalog)
 
     # ── Paso 3: preparar source_join_frames ───────────────────────────────────
     # Para fuentes sin id_col nativo se genera _clave como ID sintético,
@@ -143,7 +128,7 @@ def run_matching(sources: list, umbral: float = 85,
     # ── Paso 4: unir fuentes ──────────────────────────────────────────────────
     tabla_final = unir_fuentes_df(mapeo, *source_join_frames)
     if unified_table:
-        _save_table(unified_table, tabla_final, spark)
+        _save_table(unified_table, tabla_final, catalog)
 
     return mapeo, tabla_final
 
@@ -189,11 +174,7 @@ def clave_equipo_solo_anio(nombre, fecha):
 
 # --- Funciones de clave específicas para ligas --------------------------------
 def _normalize_league_name_for_key(nombre_raw: str) -> str:
-    """Normaliza nombres de ligas para generar claves comparables.
-
-    Elimina palabras comunes como 'league', 'liga', 'serie', 'premier',
-    quita tildes y signos, y devuelve una cadena uppercase sin espacios.
-    """
+    """Normaliza nombres de ligas para generar claves comparables."""
     if not nombre_raw:
         return ""
     s = quitar_tildes(str(nombre_raw)).lower()
