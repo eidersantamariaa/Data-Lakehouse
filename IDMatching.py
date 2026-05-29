@@ -38,37 +38,46 @@ def _load_table(table_name: str, spark=None):
             f"No se pudo cargar '{table_name}': pasa una SparkSession o conecta el catalog."
         )
 
-def _sanitize_for_spark(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Limpia un DataFrame pandas para que Spark pueda inferir el schema sin errores.
-    - Columnas completamente nulas → dtype string
-    - Columnas con dicts/listas (incluso vacíos) → json string
-    """
-    df = df.copy()
-    for col in df.columns:
+def _pandas_to_spark_safe(spark, df: pd.DataFrame):
+    from pyspark.sql.types import StructType, StructField, StringType, DoubleType, LongType
+
+    df_copy = df.copy()
+    for c in df_copy.columns:
         try:
-            serie = df[col].dropna()
-            if df[col].isna().all():
-                df[col] = pd.Series([None] * len(df), dtype="string")
+            serie = df_copy[c].dropna()
+            if df_copy[c].isna().all():
+                df_copy[c] = pd.Series([None] * len(df_copy), dtype="string")
             elif not serie.empty and serie.apply(
                 lambda x: isinstance(x, (dict, list, tuple, set))
             ).any():
-                df[col] = df[col].apply(
+                df_copy[c] = df_copy[c].apply(
                     lambda v: json.dumps(v) if isinstance(v, (dict, list, tuple, set))
                     else (None if _es_nulo(v) else v)
                 )
         except Exception:
-            df[col] = df[col].astype("string")
-    return df
+            df_copy[c] = df_copy[c].astype("string")
+
+    fields = []
+    for c in df_copy.columns:
+        dtype = df_copy[c].dtype
+        if dtype in ("float64", "float32"):
+            fields.append(StructField(c, DoubleType(), True))
+        elif dtype in ("int64", "int32"):
+            fields.append(StructField(c, LongType(), True))
+        else:
+            df_copy[c] = df_copy[c].astype("object").where(df_copy[c].notna(), None)
+            fields.append(StructField(c, StringType(), True))
+
+    return spark.createDataFrame(df_copy, StructType(fields))
 
 
 def _save_table(table_name: str, df: pd.DataFrame, spark=None):
     if spark is not None:
         (
-            spark.createDataFrame(_sanitize_for_spark(df))
-                 .writeTo(table_name)
-                 .using("iceberg")
-                 .createOrReplace()
+            _pandas_to_spark_safe(spark, df)
+                .writeTo(table_name)
+                .using("iceberg")
+                .createOrReplace()
         )
         return table_name
     try:
