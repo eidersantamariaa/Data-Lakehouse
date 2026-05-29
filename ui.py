@@ -12,7 +12,7 @@ import math
 
 from IDMatching import generar_mapeo_df, unir_fuentes_df, clave_fecha_completa, clave_solo_anio
 from plata import validar_tabla, limpiar_tabla
-from funciones_mapeo import load_table_df, save_table_df, split_table_ref
+from funciones_mapeo import load_table_df, save_table_df
 
 app = FastAPI()
 catalog = None
@@ -130,7 +130,7 @@ def list_tables():
 def schema(table: str):
     if catalog is None:
         return {}
-    ns, tbl_name = split_table_ref(table)
+    ns, tbl_name = table.split(".", 1)
     t = catalog.load_table((ns, tbl_name))
     snap = t.current_snapshot()
     summary = snap.summary if snap else {}
@@ -154,7 +154,7 @@ def preview(table: str, limit: int = 50):
     if catalog is None:
         return {"error": "Catalog not connected"}
 
-    ns, tbl_name = split_table_ref(table)
+    ns, tbl_name = table.split(".", 1)
     t = catalog.load_table((ns, tbl_name))
     snap = t.current_snapshot()
     summary = snap.summary if snap else {}
@@ -194,7 +194,7 @@ def snapshots(table: str):
     if catalog is None:
         return {}
     try:
-        ns, tbl_name = split_table_ref(table)
+        ns, tbl_name = table.split(".", 1)
         t = catalog.load_table((ns, tbl_name))
         t.refresh()
         current_id = t.current_snapshot().snapshot_id if t.current_snapshot() else None
@@ -222,7 +222,7 @@ def delete_table(table: str):
     if catalog is None:
         return JSONResponse({"error": "Catalog not connected"}, status_code=400)
     try:
-        ns, tbl_name = split_table_ref(table)
+        ns, tbl_name = table.split(".", 1)
     except ValueError:
         return JSONResponse({"error": "Formato invalido, usa namespace.tabla"}, status_code=400)
 
@@ -552,7 +552,7 @@ async def merge_apply(table: str, req: Request):
 
         errores_saved = None
         if isinstance(errores, pd.DataFrame) and not errores.empty:
-            ns, tbl = split_table_ref(target_table)
+            ns, tbl = target_table.split(".", 1)
             errores_saved = _save_table_df(f"{ns}.{tbl}_errores", errores)
 
         return {
