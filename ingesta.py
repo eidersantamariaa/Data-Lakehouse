@@ -2,6 +2,7 @@ import json
 from pyspark.sql import SparkSession
 import pyspark
 from pyspark.errors.exceptions.captured import AnalysisException
+from pyiceberg.catalog import load_catalog
 from audit_log import write_audit_log
 
 
@@ -93,6 +94,18 @@ def get_spark():
 
     return builder.getOrCreate()
 
+def get_catalog():
+    return load_catalog("players", **{
+        "type":                  "rest",
+        "uri":                   "http://172.16.58.11:32688",
+        "warehouse":             "s3://warehouse/",
+        "s3.endpoint":           "http://172.16.58.11:31224",
+        "s3.access-key-id":      "GK5f421d5f440758f74b0e0312",
+        "s3.secret-access-key":  "409baa63477885db12cd1db0a518748c5e83e971b5e8cf2129fe6c7498de125d",
+        "s3.region":             "us-east-1",
+        "s3.path-style-access":  "true",
+        "py-io-impl":            "pyiceberg.io.pyarrow.PyArrowFileIO",
+    })
 
 def run_ingesta(config, test_mode=False, namespace=None):
     spark = get_spark()

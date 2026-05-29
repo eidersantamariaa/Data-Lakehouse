@@ -38,59 +38,24 @@ def _load_table(table_name: str, spark=None):
             f"No se pudo cargar '{table_name}': pasa una SparkSession o conecta el catalog."
         )
 
-def _pandas_to_spark_safe(spark, df: pd.DataFrame):
-    from pyspark.sql.types import StructType, StructField, StringType, DoubleType, LongType
+def _save_table(table_name: str, df: pd.DataFrame, spark=None, catalog=None):
+    if catalog is None:
+        raise RuntimeError(f"No se pudo guardar '{table_name}': pasa catalog.")
+    
+    # 1. Guarda con PyIceberg (igual que ui.py)
+    import ui as _ui_module
+    _ui_module.catalog = catalog
+    from ui import _save_table_df
+    _save_table_df(table_name, df)
 
-    df_copy = df.copy()
-    for c in df_copy.columns:
-        try:
-            serie = df_copy[c].dropna()
-            if df_copy[c].isna().all():
-                df_copy[c] = pd.Series([None] * len(df_copy), dtype="string")
-            elif not serie.empty and serie.apply(
-                lambda x: isinstance(x, (dict, list, tuple, set))
-            ).any():
-                df_copy[c] = df_copy[c].apply(
-                    lambda v: json.dumps(v) if isinstance(v, (dict, list, tuple, set))
-                    else (None if _es_nulo(v) else v)
-                )
-        except Exception:
-            df_copy[c] = df_copy[c].astype("string")
-
-    fields = []
-    for c in df_copy.columns:
-        dtype = df_copy[c].dtype
-        if dtype in ("float64", "float32"):
-            fields.append(StructField(c, DoubleType(), True))
-        elif dtype in ("int64", "int32"):
-            fields.append(StructField(c, LongType(), True))
-        else:
-            df_copy[c] = df_copy[c].astype("object").where(df_copy[c].notna(), None)
-            fields.append(StructField(c, StringType(), True))
-
-    return spark.createDataFrame(df_copy, StructType(fields))
-
-
-def _save_table(table_name: str, df: pd.DataFrame, spark=None):
+    # 2. Devuelve como Spark DataFrame si se pasa spark
     if spark is not None:
-        (
-            _pandas_to_spark_safe(spark, df)
-                .writeTo(table_name)
-                .using("iceberg")
-                .createOrReplace()
-        )
-        return table_name
-    try:
-        from ui import _save_table_df
-        return _save_table_df(table_name, df)
-    except Exception:
-        raise RuntimeError(
-            f"No se pudo guardar '{table_name}': pasa una SparkSession o conecta el catalog."
-        )
+        return spark.table(table_name)
+    return df
 
 # ── Función principal ────────────────────────────────────────────────────────
 
-def run_matching(sources: list, spark=None, umbral: float = 85,
+def run_matching(sources: list, umbral: float = 85,
                  mapping_table: str = None, unified_table: str = None):
     """
     Orquesta el flujo completo de matching entre N fuentes.
